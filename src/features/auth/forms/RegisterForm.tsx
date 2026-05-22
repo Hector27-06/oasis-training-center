@@ -51,11 +51,13 @@ export default function RegisterForm() {
       setUser({
         name: normalizedName,
         email: normalizedEmail,
+        role: "member",
+        id: Math.random().toString(36).substring(2, 9),
       });
 
       Alert.alert("Cuenta creada", "Usuario guardado localmente");
 
-      router.replace("/dashboard");
+      router.replace("/(member)/member-dashboard" as any);
     } catch (error) {
       Alert.alert("Error", "No se pudo registrar");
     }

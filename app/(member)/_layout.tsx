@@ -2,9 +2,9 @@ import { Stack } from "expo-router";
 
 import ProtectedRoute from "@/src/features/auth/components/ProtectedRoute";
 
-export default function AdminLayout() {
+export default function MemberLayout() {
   return (
-    <ProtectedRoute allowedRole="admin">
+    <ProtectedRoute allowedRole="member">
       <Stack
         screenOptions={{
           headerShown: false,

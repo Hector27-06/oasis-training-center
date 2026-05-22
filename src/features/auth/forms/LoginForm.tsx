@@ -62,13 +62,15 @@ export default function LoginForm() {
       }
 
       setUser({
+        id: "1",
         name: registeredUser.name,
         email: registeredUser.email,
+        role: "member",
       });
 
       Alert.alert("Bienvenido", registeredUser.name);
 
-      router.replace("/dashboard");
+      router.replace("/member-dashboard");
     } catch (error) {
       Alert.alert("Error", "No se pudo iniciar sesión");
     }

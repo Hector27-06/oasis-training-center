@@ -1,78 +1,91 @@
-import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { Ionicons } from "@expo/vector-icons";
+
 import { COLORS } from "@/src/constants/colors";
-import { MENU_ITEMS, MenuItem } from "@/src/constants/menuItems";
 
-interface Props {
-  selected: MenuItem;
-  onSelect: (item: MenuItem) => void;
-}
+import {
+  adminMenu,
+  AdminMenuItem,
+  memberMenu,
+  UserMenuItem,
+} from "@/src/constants/menuItems";
 
-const icons: Record<MenuItem, keyof typeof Ionicons.glyphMap> = {
-  Dashboard: "grid-outline",
-  Clases: "calendar-outline",
-  PRs: "trophy-outline",
-  Membresía: "card-outline",
-  Perfil: "person-outline",
+type Props = {
+  selected: UserMenuItem | AdminMenuItem;
+
+  onSelect: (item: UserMenuItem | AdminMenuItem) => void;
+
+  onLogout: () => void;
+
+  role?: "user" | "admin";
 };
 
-export default function Sidebar({ selected, onSelect }: Props) {
+export default function Sidebar({
+  selected,
+  onSelect,
+  onLogout,
+  role = "user",
+}: Props) {
+  const menu = role === "admin" ? adminMenu : memberMenu;
+
   return (
     <View style={styles.sidebar}>
-      <View style={styles.logoBox}>
-        <View style={styles.logoIcon}>
-          <Ionicons name="barbell-outline" size={28} color={COLORS.primary} />
+      <View>
+        <View style={styles.logoContainer}>
+          <View style={styles.logoBox}>
+            <Ionicons name="barbell-outline" size={28} color={COLORS.primary} />
+          </View>
+
+          <View>
+            <Text style={styles.logo}>OASIS</Text>
+
+            <Text style={styles.subtitle}>Training Center</Text>
+          </View>
         </View>
 
-        <View>
-          <Text style={styles.logo}>OASIS</Text>
-          <Text style={styles.logoSub}>Training Center</Text>
+        <View style={styles.menu}>
+          {menu.map((item) => {
+            const active = selected === item.label;
+
+            return (
+              <Pressable
+                key={item.label}
+                onPress={() => onSelect(item.label as any)}
+                style={[styles.menuItem, active && styles.menuItemActive]}
+              >
+                <Ionicons
+                  name={item.icon as any}
+                  size={26}
+                  color={active ? "#000" : COLORS.textSecondary}
+                />
+
+                <Text
+                  style={[styles.menuText, active && styles.menuTextActive]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
-      <View style={styles.userCard}>
-        <View style={styles.userIcon}>
-          <Ionicons name="person-outline" size={24} color={COLORS.primary} />
-        </View>
-
-        <View>
-          <Text style={styles.userName}>Usuario</Text>
-          <Text style={styles.userRole}>Miembro</Text>
-        </View>
-      </View>
-
-      <View style={styles.menu}>
-        {MENU_ITEMS.map((item) => {
-          const active = selected === item;
-
-          return (
-            <Pressable
-              key={item}
-              onPress={() => onSelect(item)}
-              style={[styles.menuItem, active && styles.menuItemActive]}
-            >
-              <Ionicons
-                name={icons[item]}
-                size={24}
-                color={active ? "#000" : COLORS.textSecondary}
-              />
-
-              <Text style={[styles.menuText, active && styles.menuTextActive]}>
-                {item}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Pressable style={styles.logout}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.logout,
+          pressed && styles.logoutPressed,
+        ]}
+        onPress={onLogout}
+      >
         <Ionicons
           name="log-out-outline"
-          size={26}
+          size={24}
           color={COLORS.textSecondary}
         />
+
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </Pressable>
     </View>
@@ -81,94 +94,62 @@ export default function Sidebar({ selected, onSelect }: Props) {
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 355,
-    backgroundColor: "#111111",
+    width: 300,
+    backgroundColor: "#050505",
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
+    borderColor: COLORS.border,
+    justifyContent: "space-between",
+    paddingVertical: 30,
+  },
+
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 24,
+    marginBottom: 40,
   },
 
   logoBox: {
-    height: 110,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    gap: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-
-  logoIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: "#064E34",
-    alignItems: "center",
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: "#072B1C",
     justifyContent: "center",
+    alignItems: "center",
   },
 
   logo: {
     color: COLORS.text,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
   },
 
-  logoSub: {
+  subtitle: {
     color: COLORS.textSecondary,
     fontSize: 16,
-  },
-
-  userCard: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 20,
-    backgroundColor: "#1F1F1F",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-
-  userIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#075C39",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  userName: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  userRole: {
-    color: COLORS.textSecondary,
-    fontSize: 16,
+    marginTop: 4,
   },
 
   menu: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 14,
+    gap: 10,
+    paddingHorizontal: 12,
   },
 
   menuItem: {
-    height: 60,
-    borderRadius: 18,
+    height: 72,
+    borderRadius: 20,
     flexDirection: "row",
     alignItems: "center",
+    gap: 16,
     paddingHorizontal: 22,
-    gap: 18,
   },
 
   menuItemActive: {
     backgroundColor: COLORS.primary,
     shadowColor: COLORS.primary,
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
   },
 
   menuText: {
@@ -182,18 +163,20 @@ const styles = StyleSheet.create({
   },
 
   logout: {
-    height: 88,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 34,
-    gap: 16,
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+  },
+
+  logoutPressed: {
+    opacity: 0.6,
   },
 
   logoutText: {
     color: COLORS.textSecondary,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
   },
 });

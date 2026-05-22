@@ -6,6 +6,10 @@ export default function RootLayout() {
       screenOptions={{
         headerShown: false,
       }}
-    />
+    >
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(member)" />
+      <Stack.Screen name="(admin)" />
+    </Stack>
   );
 }
