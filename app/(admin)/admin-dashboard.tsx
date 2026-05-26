@@ -1,11 +1,19 @@
-import { Text } from "react-native";
+import React from "react";
+import { SafeAreaView, StyleSheet } from "react-native";
 
-import AppLayout from "@/src/components/layout/AppLayout";
+import AdminDashboardContent from "@/src/features/admin/components/AdminDashboardContent";
 
-export default function AdminDashboardScreen() {
+export default function AdminDashboard() {
   return (
-    <AppLayout>
-      <Text style={{ color: "white", fontSize: 30 }}>Admin Dashboard</Text>
-    </AppLayout>
+    <SafeAreaView style={styles.container}>
+      <AdminDashboardContent />
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0b0b0b",
+  },
+});

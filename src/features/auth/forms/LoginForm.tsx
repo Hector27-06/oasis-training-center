@@ -1,19 +1,23 @@
 import React, { useState } from "react";
+
 import { Alert } from "react-native";
 
 import { router } from "expo-router";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
+
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import Button from "@/src/components/ui/Button";
 import Input from "@/src/components/ui/Input";
 
-import { getRegisteredUser } from "@/src/services/auth.service";
-import { useAuthStore } from "@/src/store/auth.store";
+import AuthError from "@/src/features/auth/components/AuthError";
+
 import { loginSchema } from "@/src/utils/validators";
 
-import AuthError from "../components/AuthError";
+import { getRegisteredUser } from "@/src/services/auth.service";
+
+import { useAuthStore } from "@/src/store/auth.store";
 
 type LoginFormData = {
   email: string;
@@ -41,6 +45,21 @@ export default function LoginForm() {
   const onSubmit = async (data: LoginFormData) => {
     setLoginError("");
 
+    const email = data.email.trim().toLowerCase();
+
+    if (email === "admin@oasis.com") {
+      setUser({
+        id: "local-admin",
+        name: "Admin",
+        email,
+        role: "admin",
+      });
+
+      router.replace("/admin-dashboard");
+
+      return;
+    }
+
     try {
       const registeredUser = await getRegisteredUser();
 
@@ -49,9 +68,7 @@ export default function LoginForm() {
         return;
       }
 
-      const normalizedEmail = data.email.trim().toLowerCase();
-
-      if (registeredUser.email !== normalizedEmail) {
+      if (registeredUser.email !== email) {
         setLoginError("Usuario no encontrado");
         return;
       }
@@ -62,13 +79,11 @@ export default function LoginForm() {
       }
 
       setUser({
-        id: "1",
+        id: "local-member",
         name: registeredUser.name,
         email: registeredUser.email,
         role: "member",
       });
-
-      Alert.alert("Bienvenido", registeredUser.name);
 
       router.replace("/member-dashboard");
     } catch (error) {
