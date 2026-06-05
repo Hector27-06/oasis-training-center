@@ -1,11 +1,7 @@
 import React from "react";
 import { SafeAreaView, StyleSheet } from "react-native";
 
-import { router } from "expo-router";
-
 import Card from "@/src/components/ui/Card";
-import TabSwitcher from "@/src/components/ui/TabSwitcher";
-
 import { COLORS } from "@/src/constants/colors";
 
 import AuthHeader from "@/src/features/auth/components/AuthHeader";
@@ -17,15 +13,6 @@ export default function LoginScreen() {
       <AuthHeader />
 
       <Card>
-        <TabSwitcher
-          activeTab="login"
-          onChange={(tab) => {
-            if (tab === "register") {
-              router.push("/register");
-            }
-          }}
-        />
-
         <LoginForm />
       </Card>
     </SafeAreaView>

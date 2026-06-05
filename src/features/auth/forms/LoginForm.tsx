@@ -1,23 +1,16 @@
-import React, { useState } from "react";
-
-import { Alert } from "react-native";
-
-import { router } from "expo-router";
-
-import { Controller, useForm } from "react-hook-form";
-
 import { zodResolver } from "@hookform/resolvers/zod";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { Alert } from "react-native";
 
 import Button from "@/src/components/ui/Button";
 import Input from "@/src/components/ui/Input";
-
 import AuthError from "@/src/features/auth/components/AuthError";
 
-import { loginSchema } from "@/src/utils/validators";
-
 import { getRegisteredUser } from "@/src/services/auth.service";
-
 import { useAuthStore } from "@/src/store/auth.store";
+import { loginSchema } from "@/src/utils/validators";
 
 type LoginFormData = {
   email: string;
@@ -26,7 +19,6 @@ type LoginFormData = {
 
 export default function LoginForm() {
   const { setUser } = useAuthStore();
-
   const [loginError, setLoginError] = useState("");
 
   const {
@@ -46,8 +38,14 @@ export default function LoginForm() {
     setLoginError("");
 
     const email = data.email.trim().toLowerCase();
+    const password = data.password.trim();
 
     if (email === "admin@oasis.com") {
+      if (password !== "admin123") {
+        setLoginError("Contraseña incorrecta");
+        return;
+      }
+
       setUser({
         id: "local-admin",
         name: "Admin",
@@ -56,19 +54,13 @@ export default function LoginForm() {
       });
 
       router.replace("/admin-dashboard");
-
       return;
     }
 
     try {
       const registeredUser = await getRegisteredUser();
 
-      if (!registeredUser) {
-        setLoginError("Usuario no encontrado");
-        return;
-      }
-
-      if (registeredUser.email !== email) {
+      if (!registeredUser || registeredUser.email !== email) {
         setLoginError("Usuario no encontrado");
         return;
       }
@@ -126,7 +118,6 @@ export default function LoginForm() {
       />
 
       <AuthError message={errors.password?.message} />
-
       <AuthError message={loginError} />
 
       <Button title="Entrar" onPress={handleSubmit(onSubmit)} />
