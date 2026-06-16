@@ -69,7 +69,6 @@ export default function Input({
           onChangeText={onChangeText}
           inputMode={inputMode}
           textContentType="none"
-          importantForAutofill="no"
           selectionColor={COLORS.primary}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

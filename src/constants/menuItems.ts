@@ -52,6 +52,12 @@ export const adminMenu = [
   },
 
   {
+    label: "Horarios",
+    route: "/admin-classes",
+    icon: "calendar-outline",
+  },
+
+  {
     label: "Inventario",
     route: "/inventory",
     icon: "cube-outline",

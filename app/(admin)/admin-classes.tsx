@@ -16,7 +16,7 @@ import {
   GymClass,
 } from "@/src/features/admin/classes/types/class.types";
 
-export default function AdminScheduleScreen() {
+export default function AdminClassesScreen() {
   const [classes, setClasses] = useState<GymClass[]>(mockClasses);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ClassForm>(emptyClassForm);
