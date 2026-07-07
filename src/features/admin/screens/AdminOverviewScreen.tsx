@@ -1,40 +1,156 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { authService } from "@/src/services/auth.service";
+
+type DashboardData = {
+  totalActiveClients: number;
+  totalActiveMemberships: number;
+  monthlyRevenue: number;
+  todayAttendance: number;
+  pendingPayments: number;
+  expiringMemberships: number;
+};
+
 export default function AdminOverviewScreen() {
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [monthlyIncome, setMonthlyIncome] = useState<any[]>([]);
+  const [usersByActivity, setUsersByActivity] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [memberships, setMemberships] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      const [
+        dashboardResult,
+        monthlyIncomeResult,
+        usersByActivityResult,
+        paymentsResult,
+        membershipsResult,
+      ] = await Promise.allSettled([
+        authService.getDashboardReport(),
+        authService.getMonthlyIncome(),
+        authService.getUsersByActivity(),
+        authService.getPaymentsReport(),
+        authService.getActiveMembershipsReport(),
+      ]);
+
+      if (dashboardResult.status === "fulfilled") {
+        setDashboard(dashboardResult.value);
+      }
+
+      if (monthlyIncomeResult.status === "fulfilled") {
+        setMonthlyIncome(
+          Array.isArray(monthlyIncomeResult.value)
+            ? monthlyIncomeResult.value
+            : monthlyIncomeResult.value?.data || [],
+        );
+      }
+
+      if (usersByActivityResult.status === "fulfilled") {
+        setUsersByActivity(
+          Array.isArray(usersByActivityResult.value)
+            ? usersByActivityResult.value
+            : usersByActivityResult.value?.data || [],
+        );
+      }
+
+      if (paymentsResult.status === "fulfilled") {
+        setPayments(
+          Array.isArray(paymentsResult.value)
+            ? paymentsResult.value
+            : paymentsResult.value?.data || [],
+        );
+      }
+
+      if (membershipsResult.status === "fulfilled") {
+        setMemberships(
+          Array.isArray(membershipsResult.value)
+            ? membershipsResult.value
+            : membershipsResult.value?.data || [],
+        );
+      }
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message || "No se pudo cargar el dashboard.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalUsers = dashboard?.totalActiveClients ?? 0;
+  const activeMemberships = dashboard?.totalActiveMemberships ?? 0;
+  const monthlyRevenue = dashboard?.monthlyRevenue ?? 0;
+  const todayAttendance = dashboard?.todayAttendance ?? 0;
+  const pendingPayments = dashboard?.pendingPayments ?? 0;
+  const expiringMemberships = dashboard?.expiringMemberships ?? 0;
+
+  const recentPayments = payments.slice(0, 4);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loading}>Cargando dashboard...</Text>
+      </View>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>✕ {errorMessage}</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.statsGrid}>
         <StatCard
           title="Total Usuarios"
-          value="248"
-          detail="+12 este mes"
+          value={String(totalUsers)}
+          detail="Clientes activos"
           icon="people-outline"
           active
         />
+
         <StatCard
           title="Membresías Activas"
-          value="186"
-          detail="75.0% del total"
+          value={String(activeMemberships)}
+          detail="Membresías vigentes"
           icon="card-outline"
         />
+
         <StatCard
           title="Ingresos del Mes"
-          value="$24,580"
-          detail="+5.1% vs mes anterior"
+          value={`$${Number(monthlyRevenue).toLocaleString()}`}
+          detail="Ingresos reales"
           icon="cash-outline"
         />
+
         <StatCard
-          title="Nuevos Usuarios"
-          value="12"
-          detail="Últimos 30 días"
-          icon="person-add-outline"
+          title="Pagos Pendientes"
+          value={String(pendingPayments)}
+          detail="Por revisar"
+          icon="alert-circle-outline"
         />
+
         <StatCard
-          title="Clases Hoy"
-          value="8"
-          detail="86/120 reservas"
+          title="Asistencias Hoy"
+          value={String(todayAttendance)}
+          detail="Entradas registradas"
           icon="calendar-outline"
         />
       </View>
@@ -43,32 +159,39 @@ export default function AdminOverviewScreen() {
         <View style={[styles.panel, { flex: 1.4 }]}>
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>↗ Ingresos Mensuales</Text>
-            <Text style={styles.green}>+18.7%</Text>
+            <Text style={styles.green}>API</Text>
           </View>
 
-          <Text style={styles.bigValue}>$112,450</Text>
-          <Text style={styles.muted}>Ingresos totales</Text>
+          <Text style={styles.bigValue}>
+            ${Number(monthlyRevenue).toLocaleString()}
+          </Text>
+
+          <Text style={styles.muted}>Ingresos del mes actual</Text>
 
           <View style={styles.fakeChart}>
-            {[
-              "Ene",
-              "Feb",
-              "Mar",
-              "Abr",
-              "May",
-              "Jun",
-              "Jul",
-              "Ago",
-              "Sep",
-              "Oct",
-              "Nov",
-              "Dic",
-            ].map((m, i) => (
-              <View key={m} style={styles.chartItem}>
-                <View style={[styles.bar, { height: 35 + ((i * 17) % 90) }]} />
-                <Text style={styles.month}>{m}</Text>
-              </View>
-            ))}
+            {(monthlyIncome.length > 0
+              ? monthlyIncome
+              : [
+                  { month: "Ene", total: 0 },
+                  { month: "Feb", total: 0 },
+                  { month: "Mar", total: 0 },
+                  { month: "Abr", total: 0 },
+                  { month: "May", total: monthlyRevenue },
+                ]
+            ).map((item, index) => {
+              const label = item.month || item.name || `M${index + 1}`;
+              const value = Number(
+                item.total || item.amount || item.revenue || 0,
+              );
+              const height = Math.max(25, Math.min(120, value / 100));
+
+              return (
+                <View key={`${label}-${index}`} style={styles.chartItem}>
+                  <View style={[styles.bar, { height }]} />
+                  <Text style={styles.month}>{label}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -76,23 +199,49 @@ export default function AdminOverviewScreen() {
           <Text style={styles.panelTitle}>▭ Distribución de Membresías</Text>
 
           <View style={styles.membershipList}>
-            <Membership name="CrossFit Unlimited" value="100" percent="53.8%" />
-            <Membership name="Hyrox Training" value="45" percent="24.2%" />
-            <Membership name="Calistenia" value="32" percent="17.2%" />
-            <Membership name="Open Box" value="9" percent="4.8%" />
+            {usersByActivity.length === 0 ? (
+              <Text style={styles.muted}>Sin datos disponibles</Text>
+            ) : (
+              usersByActivity
+                .slice(0, 6)
+                .map((item, index) => (
+                  <Membership
+                    key={index}
+                    name={
+                      item.activity || item.name || item.plan || "Actividad"
+                    }
+                    value={String(item.total || item.count || item.users || 0)}
+                    percent={`${item.percent || item.percentage || 0}%`}
+                  />
+                ))
+            )}
           </View>
         </View>
 
         <View style={[styles.panel, { flex: 0.9 }]}>
           <Text style={styles.panelTitle}>Estado de Membresías</Text>
 
-          <Status label="Activas" value="186" percent="75.0%" type="active" />
-          <Status label="Por vencer" value="18" percent="7.3%" type="warning" />
-          <Status label="Vencidas" value="44" percent="17.7%" type="danger" />
+          <Status
+            label="Activas"
+            value={String(activeMemberships)}
+            type="active"
+          />
+
+          <Status
+            label="Por vencer"
+            value={String(expiringMemberships)}
+            type="warning"
+          />
+
+          <Status
+            label="Pagos pendientes"
+            value={String(pendingPayments)}
+            type="danger"
+          />
 
           <View style={styles.totalRow}>
             <Text style={styles.white}>Total</Text>
-            <Text style={styles.white}>248</Text>
+            <Text style={styles.white}>{activeMemberships}</Text>
           </View>
         </View>
       </View>
@@ -101,62 +250,62 @@ export default function AdminOverviewScreen() {
         <View style={[styles.panel, { flex: 1.2 }]}>
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>Actividad Reciente</Text>
-            <Text style={styles.green}>Ver todas</Text>
+            <Text style={styles.green}>API</Text>
           </View>
 
-          <Activity
-            name="María González"
-            detail="Nueva membresía • CrossFit Unlimited"
-            time="Hace 5 min"
-            icon="person-outline"
-          />
-          <Activity
-            name="Pago recibido de Pedro Martínez"
-            detail="Hyrox Training • $150.00"
-            time="Hace 1 hora"
-            icon="cash-outline"
-          />
-          <Activity
-            name="Nueva clase creada"
-            detail="CrossFit WOD • Mañana 06:00"
-            time="Hace 2 horas"
-            icon="calendar-outline"
-          />
-          <Activity
-            name="Entrada de inventario"
-            detail="Proteína Whey • +20 unidades"
-            time="Hace 3 horas"
-            icon="cube-outline"
-          />
+          {recentPayments.length === 0 ? (
+            <>
+              <Activity
+                name="Dashboard conectado"
+                detail="Los datos principales ya vienen desde la API"
+                time="Ahora"
+                icon="checkmark-circle-outline"
+              />
+
+              <Activity
+                name="Membresías por vencer"
+                detail={`${expiringMemberships} clientes próximos a renovar`}
+                time="Hoy"
+                icon="time-outline"
+              />
+            </>
+          ) : (
+            recentPayments.map((payment, index) => (
+              <Activity
+                key={payment.id || index}
+                name={
+                  payment.client?.firstName ||
+                  payment.clientName ||
+                  "Pago registrado"
+                }
+                detail={`$${payment.amount || 0} • ${payment.paymentMethod || "Método"}`}
+                time={payment.status || "Registrado"}
+                icon="cash-outline"
+              />
+            ))
+          )}
         </View>
 
         <View style={[styles.panel, { flex: 0.9 }]}>
-          <Text style={styles.panelTitle}>Clases Más Populares</Text>
+          <Text style={styles.panelTitle}>Membresías Activas</Text>
 
-          <Popular
-            index="1"
-            name="CrossFit WOD"
-            reservations="86 reservas"
-            percent="71.7%"
-          />
-          <Popular
-            index="2"
-            name="Hyrox Training"
-            reservations="52 reservas"
-            percent="57.8%"
-          />
-          <Popular
-            index="3"
-            name="Calistenia Básica"
-            reservations="31 reservas"
-            percent="51.7%"
-          />
-          <Popular
-            index="4"
-            name="Gimnasia & Mobility"
-            reservations="17 reservas"
-            percent="37.8%"
-          />
+          {memberships.length === 0 ? (
+            <Text style={styles.muted}>Sin membresías activas.</Text>
+          ) : (
+            memberships
+              .slice(0, 5)
+              .map((item, index) => (
+                <Popular
+                  key={item.id || index}
+                  index={String(index + 1)}
+                  name={item.plan?.name || item.name || "Membresía"}
+                  reservations={`${item.client?.firstName || "Cliente"} ${
+                    item.client?.lastName || ""
+                  }`}
+                  percent={item.status || "ACTIVE"}
+                />
+              ))
+          )}
         </View>
       </View>
     </ScrollView>
@@ -170,6 +319,7 @@ function StatCard({ title, value, detail, icon, active }: any) {
         <Text style={styles.statTitle}>{title}</Text>
         <Ionicons name={icon} size={24} color="#00ff88" />
       </View>
+
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statDetail}>{detail}</Text>
     </View>
@@ -189,17 +339,15 @@ function Membership({ name, value, percent }: any) {
   );
 }
 
-function Status({ label, value, percent, type }: any) {
+function Status({ label, value, type }: any) {
   const color =
     type === "active" ? "#00ff88" : type === "warning" ? "#facc15" : "#ff4444";
 
   return (
     <View style={styles.statusRow}>
       <Text style={[styles.white, { color }]}>{label}</Text>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={styles.white}>{value}</Text>
-        <Text style={styles.muted}>{percent}</Text>
-      </View>
+
+      <Text style={styles.white}>{value}</Text>
     </View>
   );
 }
@@ -210,10 +358,12 @@ function Activity({ name, detail, time, icon }: any) {
       <View style={styles.activityIcon}>
         <Ionicons name={icon} size={22} color="#00ff88" />
       </View>
+
       <View style={{ flex: 1 }}>
         <Text style={styles.whiteBold}>{name}</Text>
         <Text style={styles.muted}>{detail}</Text>
       </View>
+
       <Text style={styles.muted}>{time}</Text>
     </View>
   );
@@ -229,8 +379,9 @@ function Popular({ index, name, reservations, percent }: any) {
       <View style={{ flex: 1 }}>
         <Text style={styles.whiteBold}>{name}</Text>
         <Text style={styles.muted}>{reservations}</Text>
+
         <View style={styles.progress}>
-          <View style={[styles.progressFill, { width: percent }]} />
+          <View style={[styles.progressFill, { width: "70%" }]} />
         </View>
       </View>
 
@@ -240,16 +391,17 @@ function Popular({ index, name, reservations, percent }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0b0b0b",
-    padding: 24,
-  },
+  container: { flex: 1, backgroundColor: "#0b0b0b", padding: 24 },
+
+  loading: { color: "#00ff88", fontSize: 18, fontWeight: "900" },
+  error: { color: "#ff6666", fontSize: 18, fontWeight: "900" },
+
   statsGrid: {
     flexDirection: "row",
     gap: 16,
     marginBottom: 18,
   },
+
   statCard: {
     flex: 1,
     backgroundColor: "#151515",
@@ -258,34 +410,38 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 20,
   },
+
   statActive: {
     backgroundColor: "#06351f",
     borderColor: "#087a49",
   },
+
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  statTitle: {
-    color: "#b8c2cc",
-    fontWeight: "800",
-  },
+
+  statTitle: { color: "#b8c2cc", fontWeight: "800" },
+
   statValue: {
     color: "#fff",
     fontSize: 30,
     fontWeight: "900",
     marginTop: 18,
   },
+
   statDetail: {
     color: "#00ff88",
     marginTop: 6,
     fontWeight: "700",
   },
+
   row: {
     flexDirection: "row",
     gap: 18,
     marginBottom: 18,
   },
+
   panel: {
     backgroundColor: "#151515",
     borderWidth: 1,
@@ -293,35 +449,31 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 22,
   },
+
   panelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
+
   panelTitle: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "900",
+    marginBottom: 18,
   },
-  green: {
-    color: "#00ff88",
-    fontWeight: "900",
-  },
+
+  green: { color: "#00ff88", fontWeight: "900" },
+
   bigValue: {
     color: "#fff",
     fontSize: 30,
     fontWeight: "900",
-    marginTop: 18,
   },
-  muted: {
-    color: "#b8c2cc",
-  },
-  white: {
-    color: "#fff",
-  },
-  whiteBold: {
-    color: "#fff",
-    fontWeight: "900",
-  },
+
+  muted: { color: "#b8c2cc" },
+  white: { color: "#fff", fontWeight: "900" },
+  whiteBold: { color: "#fff", fontWeight: "900" },
+
   fakeChart: {
     height: 180,
     flexDirection: "row",
@@ -332,40 +484,37 @@ const styles = StyleSheet.create({
     borderTopColor: "#242424",
     paddingTop: 20,
   },
-  chartItem: {
-    flex: 1,
-    alignItems: "center",
-  },
+
+  chartItem: { flex: 1, alignItems: "center" },
+
   bar: {
     width: "70%",
     backgroundColor: "#00ff88",
     borderRadius: 8,
   },
-  month: {
-    color: "#b8c2cc",
-    marginTop: 8,
-    fontSize: 12,
-  },
-  membershipList: {
-    gap: 18,
-    marginTop: 24,
-  },
+
+  month: { color: "#b8c2cc", marginTop: 8, fontSize: 12 },
+
+  membershipList: { gap: 18, marginTop: 8 },
+
   membershipRow: {
     borderBottomWidth: 1,
     borderBottomColor: "#242424",
     paddingBottom: 12,
   },
+
   statusRow: {
     height: 64,
     borderWidth: 1,
     borderColor: "#2a2a2a",
     borderRadius: 14,
-    marginTop: 14,
+    marginTop: 12,
     paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   totalRow: {
     height: 50,
     marginTop: 14,
@@ -375,6 +524,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
   },
+
   activity: {
     flexDirection: "row",
     alignItems: "center",
@@ -383,6 +533,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#242424",
   },
+
   activityIcon: {
     width: 42,
     height: 42,
@@ -391,12 +542,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   popular: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     marginTop: 18,
   },
+
   circle: {
     width: 28,
     height: 28,
@@ -405,10 +558,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  circleText: {
-    color: "#000",
-    fontWeight: "900",
-  },
+
+  circleText: { color: "#000", fontWeight: "900" },
+
   progress: {
     height: 6,
     backgroundColor: "#2a2a2a",
@@ -416,6 +568,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: "hidden",
   },
+
   progressFill: {
     height: "100%",
     backgroundColor: "#00ff88",

@@ -1,88 +1,107 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
-
-const classes = [
-  {
-    name: "CrossFit WOD",
-    type: "CrossFit",
-    time: "06:00",
-    duration: "60 min",
-    coach: "Carlos Ruiz",
-    current: 8,
-    max: 12,
-    color: COLORS.primary,
-  },
-  {
-    name: "Hyrox Training",
-    type: "Hyrox",
-    time: "07:30",
-    duration: "90 min",
-    coach: "Ana López",
-    current: 12,
-    max: 15,
-    color: "#3b82f6",
-  },
-  {
-    name: "Gimnasia & Mobility",
-    type: "Mobility",
-    time: "09:00",
-    duration: "45 min",
-    coach: "Laura Martínez",
-    current: 10,
-    max: 10,
-    color: "#eab308",
-  },
-  {
-    name: "Open Box",
-    type: "Open",
-    time: "10:00",
-    duration: "120 min",
-    coach: "-",
-    current: 5,
-    max: 20,
-    color: "#94a3b8",
-  },
-  {
-    name: "Calistenia Básica",
-    type: "Calistenia",
-    time: "12:00",
-    duration: "60 min",
-    coach: "Miguel Torres",
-    current: 7,
-    max: 12,
-    color: "#a855f7",
-  },
-];
+import { memberService } from "@/src/services/member.service";
 
 export default function UserClassesScreen() {
+  const [classes, setClasses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    testReservations();
+  }, []);
+
+  const testReservations = async () => {
+    try {
+      const data = await memberService.getMyReservations();
+
+      console.log("MIS RESERVAS");
+      console.log(data);
+    } catch (error: any) {
+      console.log("ERROR RESERVAS");
+      console.log(error?.response?.data);
+    }
+  };
+  useEffect(() => {
+    loadClasses();
+  }, []);
+
+  const loadClasses = async () => {
+    try {
+      const data = await memberService.getSchedule();
+
+      console.log("CLASSES RESPONSE");
+      console.log(data);
+
+      setClasses(data.classes || []);
+    } catch (error) {
+      console.log(error);
+
+      Alert.alert("Error", "No fue posible cargar las clases");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reserveClass = async (classId: string) => {
+    try {
+      await memberService.reserveClass(classId);
+
+      Alert.alert("Éxito", "Clase reservada correctamente");
+
+      loadClasses();
+    } catch (error: any) {
+      console.log(error);
+
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "No fue posible reservar la clase",
+      );
+    }
+  };
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Reservar Clases</Text>
+
           <Text style={styles.subtitle}>
             Selecciona una clase y reserva tu lugar
           </Text>
-        </View>
-
-        <View style={styles.dateBox}>
-          <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.dateText}>12/05/2026</Text>
-          <Ionicons name="calendar" size={20} color={COLORS.textSecondary} />
         </View>
       </View>
 
       <View style={styles.list}>
         {classes.map((item) => {
-          const isFull = item.current >= item.max;
-          const available = item.max - item.current;
+          const isFull = item.availableSpots <= 0;
 
           return (
             <View
-              key={item.name}
+              key={item.id}
               style={[styles.classItem, isFull && styles.classItemFull]}
             >
               <View style={styles.iconBox}>
@@ -96,12 +115,6 @@ export default function UserClassesScreen() {
               <View style={styles.classInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.className}>{item.name}</Text>
-
-                  <View style={[styles.badge, { borderColor: item.color }]}>
-                    <Text style={[styles.badgeText, { color: item.color }]}>
-                      {item.type}
-                    </Text>
-                  </View>
                 </View>
 
                 <View style={styles.metaRow}>
@@ -110,19 +123,22 @@ export default function UserClassesScreen() {
                     size={16}
                     color={COLORS.textSecondary}
                   />
-                  <Text style={styles.meta}>
-                    {item.time} ({item.duration})
-                  </Text>
 
-                  <Text style={styles.meta}>Coach: {item.coach}</Text>
+                  <Text style={styles.meta}>
+                    {new Date(item.startTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
 
                   <Ionicons
                     name="people-outline"
                     size={16}
                     color={COLORS.textSecondary}
                   />
+
                   <Text style={styles.meta}>
-                    {item.current}/{item.max}
+                    {item.reservationsCount}/{item.capacity}
                   </Text>
                 </View>
               </View>
@@ -136,6 +152,7 @@ export default function UserClassesScreen() {
                         size={20}
                         color="#ff4d4f"
                       />
+
                       <Text style={styles.fullText}>Lleno</Text>
                     </View>
 
@@ -146,11 +163,16 @@ export default function UserClassesScreen() {
                 ) : (
                   <>
                     <Text style={styles.available}>
-                      {available} lugares{"\n"}
+                      {item.availableSpots}
+                      {"\n"}
+
                       <Text style={styles.availableGreen}>disponibles</Text>
                     </Text>
 
-                    <Pressable style={styles.button}>
+                    <Pressable
+                      style={styles.button}
+                      onPress={() => reserveClass(item.id)}
+                    >
                       <Text style={styles.buttonText}>Reservar</Text>
                     </Pressable>
                   </>
@@ -172,38 +194,29 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 28,
   },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 34,
   },
+
   title: {
     color: COLORS.text,
     fontSize: 30,
     fontWeight: "800",
   },
+
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: 18,
     marginTop: 8,
   },
-  dateBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#1f1f1f",
-    borderRadius: 16,
-    paddingHorizontal: 22,
-    height: 50,
-  },
-  dateText: {
-    color: COLORS.text,
-    fontSize: 20,
-    fontWeight: "700",
-  },
+
   list: {
     gap: 16,
   },
+
   classItem: {
     backgroundColor: "#1f1f1f",
     borderWidth: 1,
@@ -214,9 +227,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 20,
   },
+
   classItemFull: {
     borderColor: "#047857",
   },
+
   iconBox: {
     width: 72,
     height: 72,
@@ -225,55 +240,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   classInfo: {
     flex: 1,
   },
+
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
   },
+
   className: {
     color: COLORS.text,
     fontSize: 24,
     fontWeight: "800",
   },
-  badge: {
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    backgroundColor: "#17211c",
-  },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
+
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginTop: 12,
   },
+
   meta: {
     color: COLORS.textSecondary,
     fontSize: 16,
     marginRight: 16,
   },
+
   right: {
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
   },
+
   available: {
     color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: "right",
   },
+
   availableGreen: {
     color: COLORS.primary,
     fontWeight: "700",
   },
+
   button: {
     backgroundColor: COLORS.primary,
     height: 56,
@@ -285,21 +298,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
   },
+
   buttonText: {
     color: "#000",
     fontSize: 18,
     fontWeight: "800",
   },
+
   fullRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+
   fullText: {
     color: "#ff4d4f",
     fontSize: 18,
     fontWeight: "700",
   },
+
   disabledButton: {
     backgroundColor: "#2a2a2a",
     height: 56,
@@ -308,6 +325,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   disabledText: {
     color: COLORS.textSecondary,
     fontSize: 18,

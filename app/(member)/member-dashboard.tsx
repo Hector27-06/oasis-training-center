@@ -12,7 +12,7 @@ import { COLORS } from "@/src/constants/colors";
 
 import { UserMenuItem } from "@/src/constants/menuItems";
 
-import { getRegisteredUser } from "@/src/services/auth.service";
+import {} from "@/src/services/auth.service";
 
 import { useAuthStore } from "@/src/store/auth.store";
 

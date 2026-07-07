@@ -1,18 +1,103 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
+import { authService } from "@/src/services/auth.service";
+
+type ProfileData = {
+  email?: string;
+
+  user?: {
+    email?: string;
+    role?: string;
+  };
+
+  client?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    address?: string;
+    birthDate?: string;
+  };
+
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  birthDate?: string;
+};
 
 interface Props {
-  userName: string;
+  userName?: string;
 }
 
 export default function UserProfileScreen({ userName }: Props) {
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+
+      const response = await authService.getProfile();
+
+      console.log("PROFILE RESPONSE");
+      console.log(response);
+
+      setProfile(response);
+    } catch (error: any) {
+      console.log(error);
+
+      Alert.alert("Error", "No se pudo cargar la información del perfil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+
+        <Text style={styles.loadingText}>Cargando perfil...</Text>
+      </View>
+    );
+  }
+
+  const client = profile?.client ?? profile;
+
+  const fullName =
+    client?.firstName && client?.lastName
+      ? `${client.firstName} ${client.lastName}`
+      : userName || "Usuario";
+
+  const email = profile?.user?.email || profile?.email || "Sin correo";
+
+  const phone = client?.phone || "No registrado";
+
+  const address = client?.address || "No registrada";
+
+  const birthDate = client?.birthDate || "No registrada";
+
+  const role = profile?.user?.role || "CLIENT";
+
   return (
     <>
       <View style={styles.header}>
         <Text style={styles.title}>Mi Perfil</Text>
+
         <Text style={styles.subtitle}>Gestiona tu información personal</Text>
       </View>
 
@@ -20,8 +105,17 @@ export default function UserProfileScreen({ userName }: Props) {
         <View style={styles.cardHeader}>
           <Text style={styles.sectionTitle}>Información Personal</Text>
 
-          <Pressable style={styles.editButton}>
+          <Pressable
+            style={styles.editButton}
+            onPress={() =>
+              Alert.alert(
+                "Próximamente",
+                "La edición del perfil estará disponible pronto.",
+              )
+            }
+          >
             <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+
             <Text style={styles.editText}>Editar</Text>
           </Pressable>
         </View>
@@ -29,39 +123,36 @@ export default function UserProfileScreen({ userName }: Props) {
         <View style={styles.formGrid}>
           <Field
             label="Nombre completo"
-            value={userName || "Juan Pérez"}
+            value={fullName}
             icon="person-outline"
           />
-          <Field label="Email" value="juan@email.com" icon="mail-outline" />
-          <Field label="Teléfono" value="+34 612 345 678" icon="call-outline" />
-          <Field
-            label="Fecha de nacimiento"
-            value="15/05/1990"
-            icon="calendar-outline"
-          />
+
+          <Field label="Email" value={email} icon="mail-outline" />
+
+          <Field label="Teléfono" value={phone} icon="call-outline" />
+
+          <Field label="Rol" value={role} icon="shield-outline" />
         </View>
 
         <Field
           full
-          label="Dirección"
-          value="Madrid, España"
-          icon="location-outline"
+          label="Fecha de nacimiento"
+          value={birthDate}
+          icon="calendar-outline"
         />
-        <Field
-          full
-          label="Contacto de emergencia"
-          value="María Pérez - +34 698 765 432"
-          icon="alert-circle-outline"
-        />
+
+        <Field full label="Dirección" value={address} icon="location-outline" />
       </View>
 
       <View style={styles.membershipCard}>
-        <Text style={styles.sectionTitle}>Mi Membresía</Text>
+        <Text style={styles.sectionTitle}>Estado de la Cuenta</Text>
 
         <View style={styles.membershipGrid}>
-          <Info label="Plan actual" value="CrossFit Unlimited" />
-          <Info label="Fecha de vencimiento" value="15 Jun 2026" />
           <Info label="Estado" value="Activa" green />
+
+          <Info label="Rol" value={role} />
+
+          <Info label="Correo" value={email} />
         </View>
       </View>
     </>
@@ -83,6 +174,7 @@ function Field({
     <View style={[styles.field, full && styles.fullField]}>
       <View style={styles.labelRow}>
         <Ionicons name={icon} size={16} color={COLORS.textSecondary} />
+
         <Text style={styles.label}>{label}</Text>
       </View>
 
@@ -105,28 +197,44 @@ function Info({
   return (
     <View>
       <Text style={styles.infoLabel}>{label}</Text>
+
       <Text style={[styles.infoValue, green && styles.greenText]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loadingText: {
+    color: COLORS.text,
+    marginTop: 16,
+    fontSize: 16,
+  },
+
   header: {
     paddingBottom: 26,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     marginBottom: 26,
   },
+
   title: {
     color: COLORS.text,
     fontSize: 34,
     fontWeight: "800",
   },
+
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: 18,
     marginTop: 8,
   },
+
   profileCard: {
     backgroundColor: "#111111",
     borderWidth: 1,
@@ -138,16 +246,19 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "100%",
   },
+
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 24,
   },
+
   sectionTitle: {
     color: COLORS.text,
     fontSize: 22,
     fontWeight: "800",
   },
+
   editButton: {
     backgroundColor: "#075C39",
     borderRadius: 14,
@@ -157,35 +268,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+
   editText: {
     color: COLORS.primary,
     fontWeight: "800",
     fontSize: 15,
   },
+
   formGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 22,
   },
+
   field: {
     flexBasis: "48%",
     marginBottom: 22,
   },
+
   fullField: {
     flexBasis: "100%",
     width: "100%",
   },
+
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginBottom: 10,
   },
+
   label: {
     color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: "700",
   },
+
   inputLike: {
     height: 50,
     backgroundColor: "#151515",
@@ -195,11 +313,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
   },
+
   inputText: {
-    color: COLORS.textSecondary,
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: "700",
   },
+
   membershipCard: {
     backgroundColor: "#042F1E",
     borderWidth: 1,
@@ -210,21 +330,25 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "100%",
   },
+
   membershipGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 20,
   },
+
   infoLabel: {
     color: COLORS.textSecondary,
     fontSize: 14,
     marginBottom: 8,
   },
+
   infoValue: {
     color: COLORS.text,
     fontSize: 17,
     fontWeight: "800",
   },
+
   greenText: {
     color: COLORS.primary,
   },

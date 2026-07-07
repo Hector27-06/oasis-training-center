@@ -2,13 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Alert } from "react-native";
 
 import Button from "@/src/components/ui/Button";
 import Input from "@/src/components/ui/Input";
 import AuthError from "@/src/features/auth/components/AuthError";
 
-import { getRegisteredUser } from "@/src/services/auth.service";
+import { authService } from "@/src/services/auth.service";
 import { useAuthStore } from "@/src/store/auth.store";
 import { loginSchema } from "@/src/utils/validators";
 
@@ -19,7 +18,9 @@ type LoginFormData = {
 
 export default function LoginForm() {
   const { setUser } = useAuthStore();
+
   const [loginError, setLoginError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const {
     control,
@@ -36,50 +37,49 @@ export default function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     setLoginError("");
-
-    const email = data.email.trim().toLowerCase();
-    const password = data.password.trim();
-
-    if (email === "admin@oasis.com") {
-      if (password !== "admin123") {
-        setLoginError("Contraseña incorrecta");
-        return;
-      }
-
-      setUser({
-        id: "local-admin",
-        name: "Admin",
-        email,
-        role: "admin",
-      });
-
-      router.replace("/admin-dashboard");
-      return;
-    }
+    setLoading(true);
 
     try {
-      const registeredUser = await getRegisteredUser();
-
-      if (!registeredUser || registeredUser.email !== email) {
-        setLoginError("Usuario no encontrado");
-        return;
-      }
-
-      if (registeredUser.password !== data.password) {
-        setLoginError("Contraseña incorrecta");
-        return;
-      }
-
-      setUser({
-        id: "local-member",
-        name: registeredUser.name,
-        email: registeredUser.email,
-        role: "member",
+      const response = await authService.login({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
       });
 
-      router.replace("/member-dashboard");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo iniciar sesión");
+      console.log("LOGIN RESPONSE:", response);
+
+      const apiUser = response.user;
+
+      setUser({
+        id: apiUser.id,
+        name:
+          apiUser.client?.firstName && apiUser.client?.lastName
+            ? `${apiUser.client.firstName} ${apiUser.client.lastName}`
+            : "Admin",
+        email: apiUser.email,
+        role: apiUser.role === "ADMIN" ? "admin" : "member",
+      });
+
+      // Si viene contraseña temporal simplemente dejamos entrar
+      if (response.mustChangePassword) {
+        console.log(
+          "Usuario con contraseña temporal. Puede cambiarla después desde Perfil.",
+        );
+      }
+
+      if (apiUser.role === "ADMIN") {
+        router.replace("/admin-dashboard");
+      } else {
+        router.replace("/member-dashboard");
+      }
+    } catch (error: any) {
+      console.log("LOGIN ERROR:", error?.response?.data);
+
+      const message =
+        error?.response?.data?.message || "Correo o contraseña incorrectos";
+
+      setLoginError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,7 +91,7 @@ export default function LoginForm() {
         render={({ field }) => (
           <Input
             label="Email"
-            placeholder="usuario@ejemplo.com"
+            placeholder="usuario@gmail.com"
             value={field.value}
             onChangeText={field.onChange}
             icon="mail-outline"
@@ -120,7 +120,10 @@ export default function LoginForm() {
       <AuthError message={errors.password?.message} />
       <AuthError message={loginError} />
 
-      <Button title="Entrar" onPress={handleSubmit(onSubmit)} />
+      <Button
+        title={loading ? "Entrando..." : "Entrar"}
+        onPress={handleSubmit(onSubmit)}
+      />
     </>
   );
 }

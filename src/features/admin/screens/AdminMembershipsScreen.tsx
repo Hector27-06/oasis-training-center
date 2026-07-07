@@ -1,35 +1,159 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-const memberships = [
-  {
-    id: "1",
-    name: "CrossFit Unlimited",
-    description: "Clases ilimitadas de CrossFit",
-    price: 120,
-    duration: "1 mes",
-    members: 98,
-  },
-  {
-    id: "2",
-    name: "Hyrox Training",
-    description: "Programa especializado Hyrox",
-    price: 150,
-    duration: "1 mes",
-    members: 45,
-  },
-  {
-    id: "3",
-    name: "Calistenia",
-    description: "Clases de calistenia y bodyweight",
-    price: 100,
-    duration: "1 mes",
-    members: 32,
-  },
-];
+import { authService } from "@/src/services/auth.service";
+
+type Plan = {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  duration: number;
+  isActive?: boolean;
+};
 
 export default function AdminMembershipsScreen() {
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [duration, setDuration] = useState("");
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const loadPlans = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      const data = await authService.getMembershipPlans();
+      setPlans(data || []);
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          "No se pudieron cargar las membresías.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPlans();
+  }, []);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingPlan(null);
+    setName("");
+    setDescription("");
+    setPrice("");
+    setDuration("");
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (plan: Plan) => {
+    setEditingPlan(plan);
+    setShowForm(true);
+    setName(plan.name);
+    setDescription(plan.description || "");
+    setPrice(String(plan.price));
+    setDuration(String(plan.duration));
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const savePlan = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!name.trim()) {
+      setErrorMessage("El nombre de la membresía es obligatorio.");
+      return;
+    }
+
+    if (!description.trim()) {
+      setErrorMessage("La descripción es obligatoria.");
+      return;
+    }
+
+    if (!price || Number(price) <= 0) {
+      setErrorMessage("El precio debe ser mayor a 0.");
+      return;
+    }
+
+    if (!duration || Number(duration) <= 0) {
+      setErrorMessage("La duración debe ser mayor a 0 días.");
+      return;
+    }
+
+    try {
+      if (editingPlan) {
+        await authService.updateMembershipPlan(editingPlan.id, {
+          name: name.trim(),
+          description: description.trim(),
+          price: Number(price),
+          duration: Number(duration),
+        });
+
+        setSuccessMessage("Membresía actualizada correctamente.");
+      } else {
+        await authService.createMembershipPlan({
+          name: name.trim(),
+          description: description.trim(),
+          price: Number(price),
+          duration: Number(duration),
+        });
+
+        setSuccessMessage("Membresía creada correctamente.");
+      }
+
+      resetForm();
+      await loadPlans();
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message || "No se pudo guardar la membresía.",
+      );
+    }
+  };
+
+  const deletePlan = async (plan: Plan) => {
+    const confirmed = window.confirm(
+      `¿Seguro que deseas eliminar la membresía ${plan.name}?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await authService.deleteMembershipPlan(plan.id);
+      setSuccessMessage("Membresía eliminada correctamente.");
+      await loadPlans();
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          "No se pudo eliminar. Puede tener membresías activas asociadas.",
+      );
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -38,30 +162,127 @@ export default function AdminMembershipsScreen() {
           <Text style={styles.subtitle}>Administra planes y precios</Text>
         </View>
 
-        <Pressable style={styles.button}>
+        <Pressable style={styles.button} onPress={openCreate}>
           <Ionicons name="add-outline" size={22} color="#000" />
           <Text style={styles.buttonText}>Nueva Membresía</Text>
         </Pressable>
       </View>
 
-      <View style={styles.grid}>
-        {memberships.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Ionicons name="card-outline" size={34} color="#00ff88" />
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>✕ {errorMessage}</Text>
+        </View>
+      ) : null}
 
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.description}>{item.description}</Text>
+      {successMessage ? (
+        <View style={styles.successBox}>
+          <Text style={styles.successText}>✓ {successMessage}</Text>
+        </View>
+      ) : null}
 
-            <Info label="Precio" value={`$${item.price}`} />
-            <Info label="Duración" value={item.duration} />
-            <Info label="Miembros" value={`${item.members}`} />
+      {showForm ? (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>
+            {editingPlan ? "Editar Membresía" : "Nueva Membresía"}
+          </Text>
 
-            <Pressable style={styles.details}>
-              <Text style={styles.detailsText}>Ver detalles</Text>
+          <Text style={styles.formLabel}>Nombre</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ej. CrossFit Unlimited"
+            placeholderTextColor="#777"
+            value={name}
+            onChangeText={setName}
+          />
+
+          <Text style={styles.formLabel}>Descripción</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ej. Clases ilimitadas"
+            placeholderTextColor="#777"
+            value={description}
+            onChangeText={setDescription}
+          />
+
+          <Text style={styles.formLabel}>Precio</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="1200"
+            placeholderTextColor="#777"
+            value={price}
+            onChangeText={(value) => setPrice(value.replace(/[^0-9]/g, ""))}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.formLabel}>Duración en días</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="30"
+            placeholderTextColor="#777"
+            value={duration}
+            onChangeText={(value) => setDuration(value.replace(/[^0-9]/g, ""))}
+            keyboardType="numeric"
+          />
+
+          <View style={styles.formActions}>
+            <Pressable style={styles.cancelButton} onPress={resetForm}>
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </Pressable>
+
+            <Pressable style={styles.saveButton} onPress={savePlan}>
+              <Text style={styles.saveText}>Guardar</Text>
             </Pressable>
           </View>
-        ))}
-      </View>
+        </View>
+      ) : null}
+
+      {loading ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>Cargando membresías...</Text>
+        </View>
+      ) : plans.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>No hay membresías registradas.</Text>
+        </View>
+      ) : (
+        <View style={styles.grid}>
+          {plans.map((item) => (
+            <View key={item.id} style={styles.card}>
+              <View style={styles.cardTop}>
+                <View style={styles.iconBox}>
+                  <Ionicons name="card-outline" size={30} color="#00ff88" />
+                </View>
+
+                <View style={styles.cardActions}>
+                  <Pressable onPress={() => openEdit(item)}>
+                    <Ionicons name="create-outline" size={20} color="#9ca3af" />
+                  </Pressable>
+
+                  <Pressable onPress={() => deletePlan(item)}>
+                    <Ionicons name="trash-outline" size={20} color="#ff6666" />
+                  </Pressable>
+                </View>
+              </View>
+
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.description}>
+                {item.description || "Sin descripción"}
+              </Text>
+
+              <Info label="Precio" value={`$${item.price}`} />
+              <Info label="Duración" value={`${item.duration} días`} />
+              <Info
+                label="Estado"
+                value={item.isActive === false ? "Inactiva" : "Activa"}
+              />
+
+              <Pressable style={styles.details}>
+                <Text style={styles.detailsText}>Ver detalles</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -77,14 +298,17 @@ function Info({ label, value }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0b0b0b", padding: 24 },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 28,
   },
-  title: { color: "#fff", fontSize: 32, fontWeight: "800" },
+
+  title: { color: "#fff", fontSize: 32, fontWeight: "900" },
   subtitle: { color: "#b8c2cc", marginTop: 6 },
+
   button: {
     backgroundColor: "#00ff88",
     paddingHorizontal: 22,
@@ -94,8 +318,106 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+
   buttonText: { color: "#000", fontWeight: "900" },
+
+  errorBox: {
+    backgroundColor: "#3a1515",
+    borderWidth: 1,
+    borderColor: "#ff4444",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  errorText: { color: "#ff6666", fontWeight: "900" },
+
+  successBox: {
+    backgroundColor: "#063d26",
+    borderWidth: 1,
+    borderColor: "#00ff88",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  successText: { color: "#00ff88", fontWeight: "900" },
+
+  formCard: {
+    backgroundColor: "#151515",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 22,
+    padding: 24,
+    marginBottom: 24,
+    maxWidth: 760,
+  },
+
+  formTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+
+  formLabel: {
+    color: "#b8c2cc",
+    fontWeight: "800",
+    marginTop: 14,
+    marginBottom: 8,
+  },
+
+  input: {
+    height: 56,
+    backgroundColor: "#202020",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 14,
+    color: "#fff",
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
+
+  formActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 22,
+  },
+
+  cancelButton: {
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  cancelText: { color: "#fff", fontWeight: "900" },
+
+  saveButton: {
+    backgroundColor: "#00ff88",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  saveText: { color: "#000", fontWeight: "900" },
+
+  emptyBox: {
+    backgroundColor: "#151515",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 18,
+    padding: 24,
+  },
+
+  emptyText: {
+    color: "#b8c2cc",
+    fontWeight: "800",
+  },
+
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 18 },
+
   card: {
     width: 360,
     backgroundColor: "#171717",
@@ -104,15 +426,49 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
   },
-  name: { color: "#fff", fontSize: 24, fontWeight: "800", marginTop: 22 },
-  description: { color: "#b8c2cc", marginTop: 8, marginBottom: 22 },
+
+  cardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: "#063d26",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  cardActions: {
+    flexDirection: "row",
+    gap: 16,
+  },
+
+  name: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginTop: 22,
+  },
+
+  description: {
+    color: "#b8c2cc",
+    marginTop: 8,
+    marginBottom: 22,
+  },
+
   info: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 12,
   },
+
   label: { color: "#b8c2cc" },
   value: { color: "#fff", fontWeight: "800" },
+
   details: {
     backgroundColor: "#222",
     padding: 15,
@@ -120,5 +476,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
   },
+
   detailsText: { color: "#fff", fontWeight: "800" },
 });

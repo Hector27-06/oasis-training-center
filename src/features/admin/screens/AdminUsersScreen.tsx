@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+
 import {
   Pressable,
   ScrollView,
@@ -10,53 +11,146 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 
+import { authService } from "@/src/services/auth.service";
+
 import AdminRegisterUserScreen from "./AdminRegisterUserScreen";
 
-const users = [
-  {
-    id: "1",
-    name: "María González",
-    email: "maria@email.com",
-    membership: "CrossFit Unlimited",
-    status: "Activo",
-    expires: "2026-06-15",
-  },
-  {
-    id: "2",
-    name: "Pedro Martínez",
-    email: "pedro@email.com",
-    membership: "Hyrox Training",
-    status: "Activo",
-    expires: "2026-05-28",
-  },
-  {
-    id: "3",
-    name: "Laura Sánchez",
-    email: "laura@email.com",
-    membership: "Calistenia",
-    status: "Activo",
-    expires: "2026-07-10",
-  },
-  {
-    id: "4",
-    name: "Carlos Ruiz",
-    email: "carlos@email.com",
-    membership: "Open Box",
-    status: "Vencido",
-    expires: "2026-05-05",
-  },
-  {
-    id: "5",
-    name: "Ana López",
-    email: "ana@email.com",
-    membership: "CrossFit Unlimited",
-    status: "Por vencer",
-    expires: "2026-05-18",
-  },
-];
+type Client = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  user?: {
+    email: string;
+    role: string;
+    isActive: boolean;
+  };
+};
 
 export default function AdminUsersScreen() {
   const [showRegister, setShowRegister] = useState(false);
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+
+  const loadClients = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      const data = await authService.getClients();
+
+      setClients(data || []);
+      setFilteredClients(data || []);
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message || "No se pudieron cargar los usuarios.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+
+    const normalized = value.toLowerCase();
+
+    const result = clients.filter((client) => {
+      const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
+      const email = client.user?.email?.toLowerCase() || "";
+      const phone = client.phone || "";
+
+      return (
+        fullName.includes(normalized) ||
+        email.includes(normalized) ||
+        phone.includes(normalized)
+      );
+    });
+
+    setFilteredClients(result);
+  };
+
+  const openEdit = (client: Client) => {
+    setEditingClient(client);
+    setEditName(`${client.firstName} ${client.lastName}`);
+    setEditPhone(client.phone || "");
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const cancelEdit = () => {
+    setEditingClient(null);
+    setEditName("");
+    setEditPhone("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingClient) return;
+
+    const phoneRegex = /^[0-9]{10}$/;
+
+    const [firstName, ...lastNameParts] = editName.trim().split(" ");
+    const lastName = lastNameParts.join(" ");
+
+    if (!firstName || !lastName) {
+      setErrorMessage("Ingresa nombre y apellido.");
+      return;
+    }
+
+    if (!phoneRegex.test(editPhone.trim())) {
+      setErrorMessage("El teléfono debe tener exactamente 10 dígitos.");
+      return;
+    }
+
+    try {
+      await authService.updateClient(editingClient.id, {
+        firstName,
+        lastName,
+        phone: editPhone.trim(),
+      });
+
+      setSuccessMessage("Usuario actualizado correctamente.");
+      cancelEdit();
+      await loadClients();
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message || "No se pudo actualizar el usuario.",
+      );
+    }
+  };
+
+  const deleteClient = async (client: Client) => {
+    const confirmDelete = window.confirm(
+      `¿Seguro que deseas eliminar a ${client.firstName} ${client.lastName}?`,
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await authService.deleteClient(client.id);
+
+      setSuccessMessage("Usuario eliminado correctamente.");
+      await loadClients();
+    } catch (error: any) {
+      setErrorMessage(
+        error.response?.data?.message || "No se pudo eliminar el usuario.",
+      );
+    }
+  };
 
   if (showRegister) {
     return <AdminRegisterUserScreen />;
@@ -67,9 +161,8 @@ export default function AdminUsersScreen() {
       <View style={styles.topBar}>
         <View>
           <Text style={styles.title}>Gestión de Usuarios</Text>
-
           <Text style={styles.subtitle}>
-            Usuarios generados automáticamente desde clientes registrados
+            Clientes registrados desde el panel administrativo
           </Text>
         </View>
 
@@ -78,81 +171,129 @@ export default function AdminUsersScreen() {
           onPress={() => setShowRegister(true)}
         >
           <Ionicons name="person-add-outline" size={20} color="#000" />
-
           <Text style={styles.registerText}>Registrar Cliente</Text>
         </Pressable>
       </View>
+
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>✕ {errorMessage}</Text>
+        </View>
+      ) : null}
+
+      {successMessage ? (
+        <View style={styles.successBox}>
+          <Text style={styles.successText}>✓ {successMessage}</Text>
+        </View>
+      ) : null}
+
+      {editingClient ? (
+        <View style={styles.editCard}>
+          <Text style={styles.editTitle}>Editar usuario</Text>
+
+          <Text style={styles.label}>Nombre completo</Text>
+          <TextInput
+            style={styles.editInput}
+            value={editName}
+            onChangeText={setEditName}
+            placeholderTextColor="#777"
+          />
+
+          <Text style={styles.label}>Teléfono</Text>
+          <TextInput
+            style={styles.editInput}
+            value={editPhone}
+            onChangeText={(value) => setEditPhone(value.replace(/[^0-9]/g, ""))}
+            maxLength={10}
+            keyboardType="numeric"
+            placeholderTextColor="#777"
+          />
+
+          <View style={styles.editActions}>
+            <Pressable style={styles.cancelButton} onPress={cancelEdit}>
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </Pressable>
+
+            <Pressable style={styles.saveButton} onPress={saveEdit}>
+              <Text style={styles.saveText}>Guardar cambios</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.searchBox}>
         <Ionicons name="search-outline" size={24} color="#9ca3af" />
 
         <TextInput
           style={styles.input}
-          placeholder="Buscar por nombre, email o membresía..."
+          placeholder="Buscar por nombre, email o teléfono..."
           placeholderTextColor="#8b8b8b"
+          value={search}
+          onChangeText={handleSearch}
         />
       </View>
 
-      <View style={styles.table}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.th, { flex: 1.5 }]}>Usuario</Text>
-
-          <Text style={[styles.th, { flex: 1.5 }]}>Membresía</Text>
-
-          <Text style={[styles.th, { flex: 1 }]}>Estado</Text>
-
-          <Text style={[styles.th, { flex: 1 }]}>Vencimiento</Text>
-
-          <Text
-            style={[
-              styles.th,
-              {
-                width: 90,
-                textAlign: "right",
-              },
-            ]}
-          >
-            Acciones
-          </Text>
+      {loading ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>Cargando usuarios...</Text>
         </View>
-
-        {users.map((user) => (
-          <View key={user.id} style={styles.row}>
-            <View style={{ flex: 1.5 }}>
-              <Text style={styles.name}>{user.name}</Text>
-
-              <Text style={styles.email}>{user.email}</Text>
-            </View>
-
-            <Text style={[styles.membership, { flex: 1.5 }]}>
-              {user.membership}
+      ) : filteredClients.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>No hay usuarios registrados.</Text>
+        </View>
+      ) : (
+        <View style={styles.table}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.th, { flex: 1.5 }]}>Usuario</Text>
+            <Text style={[styles.th, { flex: 1.5 }]}>Email</Text>
+            <Text style={[styles.th, { flex: 1 }]}>Teléfono</Text>
+            <Text style={[styles.th, { flex: 1 }]}>Estado</Text>
+            <Text style={[styles.th, { width: 90, textAlign: "right" }]}>
+              Acciones
             </Text>
-
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[
-                  styles.badge,
-                  user.status === "Activo" && styles.active,
-
-                  user.status === "Vencido" && styles.expired,
-
-                  user.status === "Por vencer" && styles.warning,
-                ]}
-              >
-                {user.status}
-              </Text>
-            </View>
-
-            <Text style={[styles.date, { flex: 1 }]}>{user.expires}</Text>
-
-            <View style={styles.actions}>
-              <Ionicons name="create-outline" size={20} color="#9ca3af" />
-
-              <Ionicons name="trash-outline" size={20} color="#9ca3af" />
-            </View>
           </View>
-        ))}
-      </View>
+
+          {filteredClients.map((client) => (
+            <View key={client.id} style={styles.row}>
+              <View style={{ flex: 1.5 }}>
+                <Text style={styles.name}>
+                  {client.firstName} {client.lastName}
+                </Text>
+                <Text style={styles.email}>ID: {client.id.slice(0, 8)}</Text>
+              </View>
+
+              <Text style={[styles.membership, { flex: 1.5 }]}>
+                {client.user?.email || "Sin correo"}
+              </Text>
+
+              <Text style={[styles.date, { flex: 1 }]}>
+                {client.phone || "Sin teléfono"}
+              </Text>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.badge,
+                    client.user?.isActive ? styles.active : styles.expired,
+                  ]}
+                >
+                  {client.user?.isActive ? "Activo" : "Inactivo"}
+                </Text>
+              </View>
+
+              <View style={styles.actions}>
+                <Pressable onPress={() => openEdit(client)}>
+                  <Ionicons name="create-outline" size={20} color="#9ca3af" />
+                </Pressable>
+
+                <Pressable onPress={() => deleteClient(client)}>
+                  <Ionicons name="trash-outline" size={20} color="#ff6666" />
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -199,6 +340,98 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
+  errorBox: {
+    backgroundColor: "#3a1515",
+    borderWidth: 1,
+    borderColor: "#ff4444",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  errorText: {
+    color: "#ff6666",
+    fontWeight: "900",
+  },
+
+  successBox: {
+    backgroundColor: "#063d26",
+    borderWidth: 1,
+    borderColor: "#00ff88",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  successText: {
+    color: "#00ff88",
+    fontWeight: "900",
+  },
+
+  editCard: {
+    backgroundColor: "#151515",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 20,
+  },
+
+  editTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+
+  label: {
+    color: "#b8c2cc",
+    fontWeight: "800",
+    marginBottom: 8,
+    marginTop: 10,
+  },
+
+  editInput: {
+    height: 54,
+    backgroundColor: "#202020",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 14,
+    color: "#fff",
+    paddingHorizontal: 16,
+  },
+
+  editActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 18,
+  },
+
+  cancelButton: {
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  cancelText: {
+    color: "#fff",
+    fontWeight: "900",
+  },
+
+  saveButton: {
+    backgroundColor: "#00ff88",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  saveText: {
+    color: "#000",
+    fontWeight: "900",
+  },
+
   searchBox: {
     height: 68,
     backgroundColor: "#151515",
@@ -216,6 +449,19 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#fff",
     fontSize: 16,
+  },
+
+  emptyBox: {
+    backgroundColor: "#151515",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderRadius: 18,
+    padding: 24,
+  },
+
+  emptyText: {
+    color: "#b8c2cc",
+    fontWeight: "800",
   },
 
   table: {
@@ -283,11 +529,6 @@ const styles = StyleSheet.create({
   expired: {
     color: "#ff4d4d",
     backgroundColor: "#3a1515",
-  },
-
-  warning: {
-    color: "#facc15",
-    backgroundColor: "#3b3004",
   },
 
   date: {

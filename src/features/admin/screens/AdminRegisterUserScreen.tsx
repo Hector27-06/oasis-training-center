@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+
 import {
   Pressable,
   ScrollView,
@@ -8,23 +9,53 @@ import {
   View,
 } from "react-native";
 
-const memberships = [
-  "CrossFit Unlimited",
-  "Hyrox Training",
-  "Calistenia",
-  "Open Box",
-];
+import { authService } from "@/src/services/auth.service";
+
+type MembershipPlan = {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  duration: number;
+  isActive?: boolean;
+};
 
 export default function AdminRegisterUserScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [membership, setMembership] = useState("");
+
+  const [membership, setMembership] = useState<MembershipPlan | null>(null);
+  const [memberships, setMemberships] = useState<MembershipPlan[]>([]);
 
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleRegister = () => {
+  const [loading, setLoading] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        setLoadingPlans(true);
+
+        const plans = await authService.getMembershipPlans();
+
+        setMemberships(plans || []);
+      } catch (error: any) {
+        setErrorMessage(
+          error.response?.data?.message ||
+            "No se pudieron cargar las membresías.",
+        );
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    loadPlans();
+  }, []);
+
+  const handleRegister = async () => {
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -51,14 +82,48 @@ export default function AdminRegisterUserScreen() {
       return;
     }
 
-    setSuccessMessage(
-      `Cliente registrado correctamente. Contraseña temporal: Oasis2026#`,
-    );
+    const [firstName, ...lastNameParts] = name.trim().split(" ");
+    const lastName = lastNameParts.join(" ");
 
-    setName("");
-    setEmail("");
-    setPhone("");
-    setMembership("");
+    if (!lastName) {
+      setErrorMessage("Ingresa nombre y apellido.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await authService.registerClient({
+        firstName,
+        lastName,
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        planId: membership.id,
+        startDate: new Date().toISOString().split("T")[0],
+        activityId: null,
+        amount: Number(membership.price),
+        paymentMethod: "CASH",
+        transactionId: null,
+        notes: "Cliente registrado desde panel admin",
+      });
+
+      setSuccessMessage(
+        response?.message ||
+          "Cliente registrado correctamente. Se envió el acceso al correo.",
+      );
+
+      setName("");
+      setEmail("");
+      setPhone("");
+      setMembership(null);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message || "No se pudo registrar el cliente.";
+
+      setErrorMessage(Array.isArray(message) ? message.join(", ") : message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,6 +148,7 @@ export default function AdminRegisterUserScreen() {
 
       <View style={styles.card}>
         <Text style={styles.label}>Nombre completo</Text>
+
         <TextInput
           style={styles.input}
           placeholder="Ej. María González"
@@ -91,10 +157,12 @@ export default function AdminRegisterUserScreen() {
           onChangeText={(value) => {
             setName(value);
             setErrorMessage("");
+            setSuccessMessage("");
           }}
         />
 
         <Text style={styles.label}>Correo Gmail</Text>
+
         <TextInput
           style={styles.input}
           placeholder="usuario@gmail.com"
@@ -103,12 +171,14 @@ export default function AdminRegisterUserScreen() {
           onChangeText={(value) => {
             setEmail(value);
             setErrorMessage("");
+            setSuccessMessage("");
           }}
           autoCapitalize="none"
           inputMode="email"
         />
 
         <Text style={styles.label}>Teléfono</Text>
+
         <TextInput
           style={styles.input}
           placeholder="6141234567"
@@ -117,6 +187,7 @@ export default function AdminRegisterUserScreen() {
           onChangeText={(value) => {
             setPhone(value.replace(/[^0-9]/g, ""));
             setErrorMessage("");
+            setSuccessMessage("");
           }}
           keyboardType="numeric"
           maxLength={10}
@@ -124,45 +195,67 @@ export default function AdminRegisterUserScreen() {
 
         <Text style={styles.label}>Seleccionar membresía</Text>
 
-        <View style={styles.membershipGrid}>
-          {memberships.map((item) => {
-            const active = membership === item;
+        {loadingPlans ? (
+          <Text style={styles.loadingText}>Cargando membresías...</Text>
+        ) : memberships.length === 0 ? (
+          <Text style={styles.errorSmall}>No hay membresías disponibles.</Text>
+        ) : (
+          <View style={styles.membershipGrid}>
+            {memberships.map((item) => {
+              const active = membership?.id === item.id;
 
-            return (
-              <Pressable
-                key={item}
-                style={[
-                  styles.membershipOption,
-                  active && styles.membershipActive,
-                ]}
-                onPress={() => {
-                  setMembership(item);
-                  setErrorMessage("");
-                }}
-              >
-                <Text
+              return (
+                <Pressable
+                  key={item.id}
                   style={[
-                    styles.membershipText,
-                    active && styles.membershipTextActive,
+                    styles.membershipOption,
+                    active && styles.membershipActive,
                   ]}
+                  onPress={() => {
+                    setMembership(item);
+                    setErrorMessage("");
+                    setSuccessMessage("");
+                  }}
                 >
-                  {item}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text
+                    style={[
+                      styles.membershipText,
+                      active && styles.membershipTextActive,
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.membershipPrice,
+                      active && styles.membershipTextActive,
+                    ]}
+                  >
+                    ${item.price} · {item.duration} días
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Acceso automático</Text>
+
           <Text style={styles.infoText}>
-            El sistema generará una contraseña temporal para que el cliente
-            pueda iniciar sesión.
+            El sistema enviará una contraseña temporal al correo del cliente.
           </Text>
         </View>
 
-        <Pressable style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Registrar Cliente</Text>
+        <Pressable
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Registrando..." : "Registrar Cliente"}
+          </Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -175,17 +268,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#0b0b0b",
     padding: 24,
   },
+
   title: {
     color: "#fff",
     fontSize: 32,
     fontWeight: "900",
   },
+
   subtitle: {
     color: "#b8c2cc",
     fontSize: 16,
     marginTop: 6,
     marginBottom: 20,
   },
+
   errorBox: {
     backgroundColor: "#3a1515",
     borderWidth: 1,
@@ -195,11 +291,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     maxWidth: 760,
   },
+
   errorText: {
     color: "#ff6666",
     fontWeight: "900",
     fontSize: 15,
   },
+
   successBox: {
     backgroundColor: "#063d26",
     borderWidth: 1,
@@ -209,11 +307,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     maxWidth: 760,
   },
+
   successText: {
     color: "#00ff88",
     fontWeight: "900",
     fontSize: 15,
   },
+
   card: {
     backgroundColor: "#151515",
     borderWidth: 1,
@@ -222,6 +322,7 @@ const styles = StyleSheet.create({
     padding: 24,
     maxWidth: 760,
   },
+
   label: {
     color: "#b8c2cc",
     fontSize: 15,
@@ -229,6 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 16,
   },
+
   input: {
     height: 58,
     backgroundColor: "#202020",
@@ -239,12 +341,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+
+  loadingText: {
+    color: "#00ff88",
+    marginTop: 8,
+    fontWeight: "800",
+  },
+
+  errorSmall: {
+    color: "#ff6666",
+    marginTop: 8,
+    fontWeight: "800",
+  },
+
   membershipGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
     marginTop: 4,
   },
+
   membershipOption: {
     backgroundColor: "#202020",
     borderWidth: 1,
@@ -252,18 +368,30 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 18,
+    minWidth: 150,
   },
+
   membershipActive: {
     backgroundColor: "#00ff88",
     borderColor: "#00ff88",
   },
+
   membershipText: {
     color: "#b8c2cc",
-    fontWeight: "800",
+    fontWeight: "900",
   },
+
+  membershipPrice: {
+    color: "#9ca3af",
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
   membershipTextActive: {
     color: "#000",
   },
+
   infoBox: {
     backgroundColor: "#082d1d",
     borderWidth: 1,
@@ -272,15 +400,18 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 24,
   },
+
   infoTitle: {
     color: "#00ff88",
     fontWeight: "900",
     marginBottom: 6,
   },
+
   infoText: {
     color: "#c7f5dc",
     lineHeight: 20,
   },
+
   button: {
     marginTop: 24,
     backgroundColor: "#00ff88",
@@ -289,6 +420,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
   buttonText: {
     color: "#000",
     fontWeight: "900",
