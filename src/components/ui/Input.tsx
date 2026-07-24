@@ -33,25 +33,11 @@ export default function Input({
 }: Props) {
   const [focused, setFocused] = useState(false);
 
-  const webDisableAutofill = {
-    autoComplete: "off",
-
-    autoCorrect: "off",
-
-    autoCapitalize: "none",
-
-    spellCheck: false,
-
-    name: `no-autofill-${label}-${Date.now()}`,
-
-    id: `no-autofill-${label}-${Date.now()}`,
-  } as any;
-
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
 
-      <View style={[styles.inputContainer, focused && styles.inputFocused]}>
+      <View style={styles.inputContainer}>
         <Ionicons
           name={icon}
           size={20}
@@ -60,16 +46,19 @@ export default function Input({
         />
 
         <TextInput
-          {...webDisableAutofill}
+          style={styles.input}
           placeholder={placeholder}
           placeholderTextColor="#737373"
-          secureTextEntry={secureTextEntry}
-          style={styles.input}
           value={value}
           onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          selectionColor={COLORS.primary}
+          autoCorrect={false}
+          autoCapitalize="none"
+          spellCheck={false}
           inputMode={inputMode}
           textContentType="none"
-          selectionColor={COLORS.primary}
+          autoComplete="off"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
@@ -141,7 +130,7 @@ const styles = StyleSheet.create({
 
     fontWeight: "500",
 
-    outlineStyle: "none" as any,
+    //outlineStyle: "none" as any,
 
     borderWidth: 0,
 

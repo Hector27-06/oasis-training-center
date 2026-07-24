@@ -4,6 +4,9 @@ import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 
+import useResponsive from "@/src/hooks/useResponsive";
+import AdminBottomNav from "./AdminBottomNav";
+
 import { router } from "expo-router";
 
 import AdminInventoryScreen from "../screens/AdminInventoryScreen";
@@ -23,7 +26,10 @@ type Tab =
 
 export default function AdminDashboardContent() {
   const [selected, setSelected] = useState<Tab>("Dashboard");
-
+  const { isMobile } = useResponsive();
+  console.log("WIDTH:", {
+    isMobile,
+  });
   const renderScreen = () => {
     switch (selected) {
       case "Dashboard":
@@ -50,95 +56,106 @@ export default function AdminDashboardContent() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        isMobile && {
+          flexDirection: "column",
+        },
+      ]}
+    >
       {/* SIDEBAR */}
-      <View style={styles.sidebar}>
-        <View>
-          {/* LOGO */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoBox}>
-              <Ionicons name="barbell-outline" size={28} color="#00ff88" />
+      {!isMobile && (
+        <View style={styles.sidebar}>
+          <View>
+            {/* LOGO */}
+            <View style={styles.logoContainer}>
+              <View style={styles.logoBox}>
+                <Ionicons name="barbell-outline" size={28} color="#00ff88" />
+              </View>
+
+              <View>
+                <Text style={styles.logo}>OASIS</Text>
+
+                <Text style={styles.logoSubtitle}>Training Center</Text>
+              </View>
             </View>
 
-            <View>
-              <Text style={styles.logo}>OASIS</Text>
+            {/* ADMIN CARD */}
+            <View style={styles.adminCard}>
+              <View style={styles.adminIcon}>
+                <Ionicons name="person-outline" size={24} color="#00ff88" />
+              </View>
 
-              <Text style={styles.logoSubtitle}>Training Center</Text>
+              <View>
+                <Text style={styles.adminName}>Admin</Text>
+
+                <Text style={styles.adminRole}>Administrador</Text>
+              </View>
+            </View>
+
+            {/* MENU */}
+            <View style={styles.menu}>
+              <MenuItem
+                label="Dashboard"
+                icon="grid-outline"
+                active={selected === "Dashboard"}
+                onPress={() => setSelected("Dashboard")}
+              />
+
+              <MenuItem
+                label="Usuarios"
+                icon="people-outline"
+                active={selected === "Usuarios"}
+                onPress={() => setSelected("Usuarios")}
+              />
+
+              <MenuItem
+                label="Membresías"
+                icon="card-outline"
+                active={selected === "Membresías"}
+                onPress={() => setSelected("Membresías")}
+              />
+
+              <MenuItem
+                label="Horarios"
+                icon="calendar-outline"
+                active={selected === "Horarios"}
+                onPress={() => setSelected("Horarios")}
+              />
+
+              <MenuItem
+                label="Inventario"
+                icon="cube-outline"
+                active={selected === "Inventario"}
+                onPress={() => setSelected("Inventario")}
+              />
+
+              <MenuItem
+                label="Configuración"
+                icon="settings-outline"
+                active={selected === "Configuración"}
+                onPress={() => setSelected("Configuración")}
+              />
             </View>
           </View>
 
-          {/* ADMIN CARD */}
-          <View style={styles.adminCard}>
-            <View style={styles.adminIcon}>
-              <Ionicons name="person-outline" size={24} color="#00ff88" />
-            </View>
+          {/* LOGOUT */}
+          <Pressable
+            style={styles.logout}
+            onPress={() => router.replace("/login")}
+          >
+            <Ionicons name="log-out-outline" size={22} color="#9ca3af" />
 
-            <View>
-              <Text style={styles.adminName}>Admin</Text>
-
-              <Text style={styles.adminRole}>Administrador</Text>
-            </View>
-          </View>
-
-          {/* MENU */}
-          <View style={styles.menu}>
-            <MenuItem
-              label="Dashboard"
-              icon="grid-outline"
-              active={selected === "Dashboard"}
-              onPress={() => setSelected("Dashboard")}
-            />
-
-            <MenuItem
-              label="Usuarios"
-              icon="people-outline"
-              active={selected === "Usuarios"}
-              onPress={() => setSelected("Usuarios")}
-            />
-
-            <MenuItem
-              label="Membresías"
-              icon="card-outline"
-              active={selected === "Membresías"}
-              onPress={() => setSelected("Membresías")}
-            />
-
-            <MenuItem
-              label="Horarios"
-              icon="calendar-outline"
-              active={selected === "Horarios"}
-              onPress={() => setSelected("Horarios")}
-            />
-
-            <MenuItem
-              label="Inventario"
-              icon="cube-outline"
-              active={selected === "Inventario"}
-              onPress={() => setSelected("Inventario")}
-            />
-
-            <MenuItem
-              label="Configuración"
-              icon="settings-outline"
-              active={selected === "Configuración"}
-              onPress={() => setSelected("Configuración")}
-            />
-          </View>
+            <Text style={styles.logoutText}>Cerrar sesión</Text>
+          </Pressable>
         </View>
-
-        {/* LOGOUT */}
-        <Pressable
-          style={styles.logout}
-          onPress={() => router.replace("/login")}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#9ca3af" />
-
-          <Text style={styles.logoutText}>Cerrar sesión</Text>
-        </Pressable>
-      </View>
-
+      )}
       {/* CONTENT */}
       <View style={styles.content}>{renderScreen()}</View>
+      {isMobile && (
+        <AdminBottomNav selected={selected} onSelect={setSelected} />
+      )}
     </SafeAreaView>
   );
 }
@@ -281,5 +298,6 @@ const styles = StyleSheet.create({
 
   content: {
     flex: 1,
+    width: "100%",
   },
 });

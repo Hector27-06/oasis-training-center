@@ -1,6 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
 import { GymClass } from "../types/class.types";
@@ -18,36 +24,52 @@ export default function AdminClassCard({
   onCancel,
   onDelete,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const availablePlaces = item.capacity - item.reserved;
 
   return (
     <View
-      style={[styles.card, item.status === "cancelled" && styles.cancelled]}
+      style={[
+        styles.card,
+        item.status === "cancelled" && styles.cancelled,
+        isMobile && styles.cardMobile,
+      ]}
     >
-      <View style={styles.iconBox}>
-        <Ionicons name="time-outline" size={32} color={COLORS.primary} />
-      </View>
-
-      <View style={styles.info}>
-        <View style={styles.titleRow}>
-          <Text style={styles.name}>{item.name}</Text>
-
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.category}</Text>
-          </View>
+      <View style={styles.topRow}>
+        <View style={[styles.iconBox, isMobile && styles.iconBoxMobile]}>
+          <Ionicons
+            name="time-outline"
+            size={isMobile ? 22 : 32}
+            color={COLORS.primary}
+          />
         </View>
 
-        <Text style={styles.meta}>
-          {item.time} ({item.duration}) · Coach: {item.coach} · {item.reserved}/
-          {item.capacity}
-        </Text>
+        <View style={styles.info}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name}
+            </Text>
+
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{item.category}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.meta}>
+            {item.time} ({item.duration}) · Coach: {item.coach} ·{" "}
+            {item.reserved}/{item.capacity}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.right}>
+      <View style={[styles.right, isMobile && styles.rightMobile]}>
         <Text
           style={[
             styles.status,
             item.status !== "available" && styles.dangerStatus,
+            isMobile && styles.statusMobile,
           ]}
         >
           {item.status === "available"
@@ -57,25 +79,46 @@ export default function AdminClassCard({
               : "Cancelada"}
         </Text>
 
-        <View style={styles.actions}>
-          <Pressable style={styles.editButton} onPress={() => onEdit(item)}>
-            <Text style={styles.editText}>Editar</Text>
+        <View style={[styles.actions, isMobile && styles.actionsMobile]}>
+          <Pressable
+            style={[styles.editButton, isMobile && styles.actionButtonMobile]}
+            onPress={() => onEdit(item)}
+          >
+            <Text
+              style={[styles.editText, isMobile && styles.actionTextMobile]}
+              numberOfLines={1}
+            >
+              Editar
+            </Text>
           </Pressable>
 
           {item.status !== "cancelled" && (
             <Pressable
-              style={styles.cancelButton}
+              style={[
+                styles.cancelButton,
+                isMobile && styles.actionButtonMobile,
+              ]}
               onPress={() => onCancel(item.id)}
             >
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text
+                style={[styles.cancelText, isMobile && styles.actionTextMobile]}
+                numberOfLines={1}
+              >
+                Cancelar
+              </Text>
             </Pressable>
           )}
 
           <Pressable
-            style={styles.deleteButton}
+            style={[styles.deleteButton, isMobile && styles.actionButtonMobile]}
             onPress={() => onDelete(item.id)}
           >
-            <Text style={styles.deleteText}>Eliminar</Text>
+            <Text
+              style={[styles.deleteText, isMobile && styles.actionTextMobile]}
+              numberOfLines={1}
+            >
+              Eliminar
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -96,9 +139,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
+  cardMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 14,
+    padding: 16,
+  },
+
   cancelled: {
     opacity: 0.65,
     borderColor: COLORS.danger,
+  },
+
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    flex: 1,
   },
 
   iconBox: {
@@ -108,6 +165,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#075C39",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  iconBoxMobile: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
   },
 
   info: {
@@ -125,6 +188,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 24,
     fontWeight: "800",
+    flexShrink: 1,
   },
 
   badge: {
@@ -149,10 +213,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
+  rightMobile: {
+    alignItems: "stretch",
+    width: "100%",
+  },
+
   status: {
     color: COLORS.primary,
     fontSize: 16,
     fontWeight: "800",
+  },
+
+  statusMobile: {
+    textAlign: "left",
   },
 
   dangerStatus: {
@@ -162,6 +235,21 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     gap: 10,
+  },
+
+  actionsMobile: {
+    width: "100%",
+    gap: 6,
+  },
+
+  actionButtonMobile: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+
+  actionTextMobile: {
+    fontSize: 13,
   },
 
   editButton: {

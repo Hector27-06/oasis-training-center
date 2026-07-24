@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
 
     marginTop: 10,
 
-    cursor: "pointer" as any,
+    //cursor: "pointer" as any,
   },
 
   pressed: {

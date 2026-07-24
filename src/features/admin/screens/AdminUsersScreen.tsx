@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -28,6 +29,9 @@ type Client = {
 };
 
 export default function AdminUsersScreen() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [showRegister, setShowRegister] = useState(false);
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -157,17 +161,22 @@ export default function AdminUsersScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.topBar}>
+    <ScrollView style={[styles.container, isMobile && styles.containerMobile]}>
+      <View style={[styles.topBar, isMobile && styles.topBarMobile]}>
         <View>
-          <Text style={styles.title}>Gestión de Usuarios</Text>
+          <Text style={[styles.title, isMobile && styles.titleMobile]}>
+            Gestión de Usuarios
+          </Text>
           <Text style={styles.subtitle}>
             Clientes registrados desde el panel administrativo
           </Text>
         </View>
 
         <Pressable
-          style={styles.registerButton}
+          style={[
+            styles.registerButton,
+            isMobile && styles.registerButtonMobile,
+          ]}
           onPress={() => setShowRegister(true)}
         >
           <Ionicons name="person-add-outline" size={20} color="#000" />
@@ -240,6 +249,64 @@ export default function AdminUsersScreen() {
       ) : filteredClients.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyText}>No hay usuarios registrados.</Text>
+        </View>
+      ) : isMobile ? (
+        <View style={styles.mobileList}>
+          {filteredClients.map((client) => (
+            <View key={client.id} style={styles.mobileCard}>
+              <View style={styles.mobileCardTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>
+                    {client.firstName} {client.lastName}
+                  </Text>
+                  <Text style={styles.email}>ID: {client.id.slice(0, 8)}</Text>
+                </View>
+
+                <Text
+                  style={[
+                    styles.badge,
+                    client.user?.isActive ? styles.active : styles.expired,
+                  ]}
+                >
+                  {client.user?.isActive ? "Activo" : "Inactivo"}
+                </Text>
+              </View>
+
+              <View style={styles.mobileRow}>
+                <Ionicons name="mail-outline" size={16} color="#8b8b8b" />
+                <Text style={styles.mobileText} numberOfLines={1}>
+                  {client.user?.email || "Sin correo"}
+                </Text>
+              </View>
+
+              <View style={styles.mobileRow}>
+                <Ionicons name="call-outline" size={16} color="#8b8b8b" />
+                <Text style={styles.mobileText}>
+                  {client.phone || "Sin teléfono"}
+                </Text>
+              </View>
+
+              <View style={styles.mobileActions}>
+                <Pressable
+                  style={styles.mobileActionBtn}
+                  onPress={() => openEdit(client)}
+                >
+                  <Ionicons name="create-outline" size={18} color="#9ca3af" />
+                  <Text style={styles.mobileActionText}>Editar</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.mobileActionBtn}
+                  onPress={() => deleteClient(client)}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#ff6666" />
+                  <Text style={[styles.mobileActionText, { color: "#ff6666" }]}>
+                    Eliminar
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
         </View>
       ) : (
         <View style={styles.table}>
@@ -541,5 +608,82 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 18,
+  },
+
+  containerMobile: {
+    padding: 16,
+  },
+
+  topBarMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 16,
+  },
+
+  titleMobile: {
+    fontSize: 22,
+  },
+
+  registerButtonMobile: {
+    width: "100%",
+    justifyContent: "center",
+  },
+
+  mobileList: {
+    gap: 12,
+  },
+
+  mobileCard: {
+    backgroundColor: "#121212",
+    borderWidth: 1,
+    borderColor: "#2b2b2b",
+    borderRadius: 18,
+    padding: 16,
+  },
+
+  mobileCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+    gap: 10,
+  },
+
+  mobileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  mobileText: {
+    color: "#b8c2cc",
+    fontSize: 14,
+    flexShrink: 1,
+  },
+
+  mobileActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#242424",
+    paddingTop: 12,
+  },
+
+  mobileActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#1c1c1c",
+    borderRadius: 10,
+  },
+
+  mobileActionText: {
+    color: "#9ca3af",
+    fontWeight: "700",
+    fontSize: 13,
   },
 });

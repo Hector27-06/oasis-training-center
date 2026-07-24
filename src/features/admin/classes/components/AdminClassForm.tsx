@@ -1,5 +1,12 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
 import { days } from "../data/mockClasses";
@@ -20,9 +27,12 @@ export default function AdminClassForm({
   onSave,
   onCancelEdit,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>
+    <View style={[styles.card, isMobile && styles.cardMobile]}>
+      <Text style={[styles.title, isMobile && styles.titleMobile]}>
         {editing ? "Editar clase" : "Agregar nueva clase"}
       </Text>
 
@@ -31,10 +41,19 @@ export default function AdminClassForm({
           <Pressable
             key={day}
             onPress={() => onChange({ ...form, day })}
-            style={[styles.dayButton, form.day === day && styles.dayActive]}
+            style={[
+              styles.dayButton,
+              form.day === day && styles.dayActive,
+              isMobile && styles.dayButtonMobile,
+            ]}
           >
             <Text
-              style={[styles.dayText, form.day === day && styles.dayTextActive]}
+              style={[
+                styles.dayText,
+                form.day === day && styles.dayTextActive,
+                isMobile && styles.dayTextMobile,
+              ]}
+              numberOfLines={1}
             >
               {day}
             </Text>
@@ -47,42 +66,60 @@ export default function AdminClassForm({
           placeholder="Nombre de clase"
           value={form.name}
           onChangeText={(name) => onChange({ ...form, name })}
+          isMobile={isMobile}
         />
         <Input
           placeholder="Categoría"
           value={form.category}
           onChangeText={(category) => onChange({ ...form, category })}
+          isMobile={isMobile}
         />
         <Input
           placeholder="Hora, ejemplo: 06:00"
           value={form.time}
           onChangeText={(time) => onChange({ ...form, time })}
+          isMobile={isMobile}
         />
         <Input
           placeholder="Duración, ejemplo: 60 min"
           value={form.duration}
           onChangeText={(duration) => onChange({ ...form, duration })}
+          isMobile={isMobile}
         />
         <Input
           placeholder="Coach"
           value={form.coach}
           onChangeText={(coach) => onChange({ ...form, coach })}
+          isMobile={isMobile}
         />
         <Input
           placeholder="Capacidad"
           value={form.capacity}
           onChangeText={(capacity) => onChange({ ...form, capacity })}
+          isMobile={isMobile}
         />
       </View>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, isMobile && styles.actionsMobile]}>
         {editing && (
-          <Pressable style={styles.secondaryButton} onPress={onCancelEdit}>
+          <Pressable
+            style={[
+              styles.secondaryButton,
+              isMobile && styles.actionButtonFullMobile,
+            ]}
+            onPress={onCancelEdit}
+          >
             <Text style={styles.secondaryText}>Cancelar edición</Text>
           </Pressable>
         )}
 
-        <Pressable style={styles.primaryButton} onPress={onSave}>
+        <Pressable
+          style={[
+            styles.primaryButton,
+            isMobile && styles.actionButtonFullMobile,
+          ]}
+          onPress={onSave}
+        >
           <Text style={styles.primaryText}>
             {editing ? "Guardar cambios" : "Agendar clase"}
           </Text>
@@ -96,10 +133,12 @@ function Input({
   placeholder,
   value,
   onChangeText,
+  isMobile,
 }: {
   placeholder: string;
   value: string;
   onChangeText: (text: string) => void;
+  isMobile?: boolean;
 }) {
   return (
     <TextInput
@@ -107,7 +146,7 @@ function Input({
       placeholderTextColor={COLORS.textSecondary}
       value={value}
       onChangeText={onChangeText}
-      style={styles.input}
+      style={[styles.input, isMobile && styles.inputMobile]}
     />
   );
 }
@@ -122,6 +161,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
 
+  cardMobile: {
+    padding: 16,
+    borderRadius: 16,
+  },
+
   title: {
     color: COLORS.text,
     fontSize: 28,
@@ -129,10 +173,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  titleMobile: {
+    fontSize: 20,
+    marginBottom: 14,
+  },
+
   daysRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
     marginBottom: 22,
   },
 
@@ -145,6 +194,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
+  dayButtonMobile: {
+    width: "31%",
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   dayActive: {
     backgroundColor: COLORS.primary,
   },
@@ -152,6 +208,11 @@ const styles = StyleSheet.create({
   dayText: {
     color: COLORS.textSecondary,
     fontWeight: "700",
+  },
+
+  dayTextMobile: {
+    fontSize: 13,
+    textAlign: "center",
   },
 
   dayTextActive: {
@@ -177,11 +238,20 @@ const styles = StyleSheet.create({
     outlineStyle: "none" as any,
   },
 
+  inputMobile: {
+    width: "100%",
+  },
+
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 14,
     marginTop: 24,
+  },
+
+  actionsMobile: {
+    flexDirection: "column",
+    gap: 12,
   },
 
   primaryButton: {
@@ -195,6 +265,7 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "800",
     fontSize: 17,
+    textAlign: "center",
   },
 
   secondaryButton: {
@@ -208,5 +279,11 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: "800",
     fontSize: 17,
+    textAlign: "center",
+  },
+
+  actionButtonFullMobile: {
+    width: "100%",
+    alignItems: "center",
   },
 });

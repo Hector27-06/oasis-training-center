@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -21,6 +22,9 @@ type Plan = {
 };
 
 export default function AdminMembershipsScreen() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -155,14 +159,19 @@ export default function AdminMembershipsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, isMobile && styles.containerMobile]}>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View>
-          <Text style={styles.title}>Gestión de Membresías</Text>
+          <Text style={[styles.title, isMobile && styles.titleMobile]}>
+            Gestión de Membresías
+          </Text>
           <Text style={styles.subtitle}>Administra planes y precios</Text>
         </View>
 
-        <Pressable style={styles.button} onPress={openCreate}>
+        <Pressable
+          style={[styles.button, isMobile && styles.buttonMobile]}
+          onPress={openCreate}
+        >
           <Ionicons name="add-outline" size={22} color="#000" />
           <Text style={styles.buttonText}>Nueva Membresía</Text>
         </Pressable>
@@ -299,6 +308,8 @@ function Info({ label, value }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0b0b0b", padding: 24 },
 
+  containerMobile: { padding: 16 },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -306,7 +317,14 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
 
+  headerMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 16,
+  },
+
   title: { color: "#fff", fontSize: 32, fontWeight: "900" },
+  titleMobile: { fontSize: 24 },
   subtitle: { color: "#b8c2cc", marginTop: 6 },
 
   button: {
@@ -316,7 +334,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
+  },
+
+  buttonMobile: {
+    width: "100%",
   },
 
   buttonText: { color: "#000", fontWeight: "900" },
@@ -425,6 +448,11 @@ const styles = StyleSheet.create({
     borderColor: "#2a2a2a",
     borderRadius: 24,
     padding: 24,
+  },
+
+  cardMobile: {
+    width: "100%",
+    padding: 18,
   },
 
   cardTop: {

@@ -1,8 +1,8 @@
+import useResponsive from "@/src/hooks/useResponsive";
+import { authService } from "@/src/services/auth.service";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-
-import { authService } from "@/src/services/auth.service";
 
 type DashboardData = {
   totalActiveClients: number;
@@ -14,6 +14,7 @@ type DashboardData = {
 };
 
 export default function AdminOverviewScreen() {
+  const { isMobile } = useResponsive();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [monthlyIncome, setMonthlyIncome] = useState<any[]>([]);
   const [usersByActivity, setUsersByActivity] = useState<any[]>([]);
@@ -116,58 +117,75 @@ export default function AdminOverviewScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.statsGrid}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{
+        paddingBottom: isMobile ? 110 : 30,
+      }}
+    >
+      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
         <StatCard
           title="Total Usuarios"
           value={String(totalUsers)}
           detail="Clientes activos"
           icon="people-outline"
           active
+          isMobile={isMobile}
         />
-
         <StatCard
           title="Membresías Activas"
           value={String(activeMemberships)}
           detail="Membresías vigentes"
           icon="card-outline"
+          isMobile={isMobile}
         />
-
         <StatCard
           title="Ingresos del Mes"
           value={`$${Number(monthlyRevenue).toLocaleString()}`}
           detail="Ingresos reales"
           icon="cash-outline"
+          isMobile={isMobile}
         />
-
         <StatCard
           title="Pagos Pendientes"
           value={String(pendingPayments)}
           detail="Por revisar"
           icon="alert-circle-outline"
+          isMobile={isMobile}
         />
-
         <StatCard
           title="Asistencias Hoy"
           value={String(todayAttendance)}
           detail="Entradas registradas"
           icon="calendar-outline"
+          isMobile={isMobile}
         />
       </View>
-
-      <View style={styles.row}>
-        <View style={[styles.panel, { flex: 1.4 }]}>
+      <View
+        style={[
+          styles.row,
+          isMobile && {
+            flexDirection: "column",
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.panel,
+            {
+              flex: isMobile ? undefined : 1.4,
+              width: isMobile ? "100%" : undefined,
+            },
+          ]}
+        >
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>↗ Ingresos Mensuales</Text>
             <Text style={styles.green}>API</Text>
           </View>
-
           <Text style={styles.bigValue}>
             ${Number(monthlyRevenue).toLocaleString()}
           </Text>
-
           <Text style={styles.muted}>Ingresos del mes actual</Text>
-
           <View style={styles.fakeChart}>
             {(monthlyIncome.length > 0
               ? monthlyIncome
@@ -194,10 +212,16 @@ export default function AdminOverviewScreen() {
             })}
           </View>
         </View>
-
-        <View style={[styles.panel, { flex: 1 }]}>
+        <View
+          style={[
+            styles.panel,
+            {
+              flex: isMobile ? undefined : 1,
+              width: isMobile ? "100%" : undefined,
+            },
+          ]}
+        >
           <Text style={styles.panelTitle}>▭ Distribución de Membresías</Text>
-
           <View style={styles.membershipList}>
             {usersByActivity.length === 0 ? (
               <Text style={styles.muted}>Sin datos disponibles</Text>
@@ -217,36 +241,45 @@ export default function AdminOverviewScreen() {
             )}
           </View>
         </View>
-
-        <View style={[styles.panel, { flex: 0.9 }]}>
+        <View
+          style={[
+            styles.panel,
+            {
+              flex: isMobile ? undefined : 0.9,
+              width: isMobile ? "100%" : undefined,
+            },
+          ]}
+        >
           <Text style={styles.panelTitle}>Estado de Membresías</Text>
-
           <Status
             label="Activas"
             value={String(activeMemberships)}
             type="active"
           />
-
           <Status
             label="Por vencer"
             value={String(expiringMemberships)}
             type="warning"
           />
-
           <Status
             label="Pagos pendientes"
             value={String(pendingPayments)}
             type="danger"
           />
-
           <View style={styles.totalRow}>
             <Text style={styles.white}>Total</Text>
             <Text style={styles.white}>{activeMemberships}</Text>
           </View>
         </View>
       </View>
-
-      <View style={styles.row}>
+      <View
+        style={[
+          styles.row,
+          isMobile && {
+            flexDirection: "column",
+          },
+        ]}
+      >
         <View style={[styles.panel, { flex: 1.2 }]}>
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>Actividad Reciente</Text>
@@ -285,7 +318,6 @@ export default function AdminOverviewScreen() {
             ))
           )}
         </View>
-
         <View style={[styles.panel, { flex: 0.9 }]}>
           <Text style={styles.panelTitle}>Membresías Activas</Text>
 
@@ -312,15 +344,23 @@ export default function AdminOverviewScreen() {
   );
 }
 
-function StatCard({ title, value, detail, icon, active }: any) {
+function StatCard({ title, value, detail, icon, active, isMobile }: any) {
   return (
-    <View style={[styles.statCard, active && styles.statActive]}>
+    <View
+      style={[
+        styles.statCard,
+        active && styles.statActive,
+        isMobile && styles.statCardMobile,
+      ]}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.statTitle}>{title}</Text>
-        <Ionicons name={icon} size={24} color="#00ff88" />
+        <Ionicons name={icon} size={isMobile ? 20 : 24} color="#00ff88" />
       </View>
 
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, isMobile && styles.statValueMobile]}>
+        {value}
+      </Text>
       <Text style={styles.statDetail}>{detail}</Text>
     </View>
   );
@@ -398,17 +438,30 @@ const styles = StyleSheet.create({
 
   statsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 16,
     marginBottom: 18,
   },
 
+  statsGridMobile: {
+    gap: 10,
+  },
+
   statCard: {
     flex: 1,
+    minWidth: 180,
     backgroundColor: "#151515",
     borderWidth: 1,
     borderColor: "#2a2a2a",
     borderRadius: 18,
     padding: 20,
+  },
+
+  statCardMobile: {
+    flex: undefined,
+    minWidth: 0,
+    width: "48%",
+    padding: 14,
   },
 
   statActive: {
@@ -430,6 +483,11 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
 
+  statValueMobile: {
+    fontSize: 24,
+    marginTop: 10,
+  },
+
   statDetail: {
     color: "#00ff88",
     marginTop: 6,
@@ -438,11 +496,13 @@ const styles = StyleSheet.create({
 
   row: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 18,
     marginBottom: 18,
   },
 
   panel: {
+    minWidth: 300,
     backgroundColor: "#151515",
     borderWidth: 1,
     borderColor: "#2a2a2a",
@@ -466,7 +526,7 @@ const styles = StyleSheet.create({
 
   bigValue: {
     color: "#fff",
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: "900",
   },
 
@@ -475,7 +535,7 @@ const styles = StyleSheet.create({
   whiteBold: { color: "#fff", fontWeight: "900" },
 
   fakeChart: {
-    height: 180,
+    minHeight: 180,
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 14,
