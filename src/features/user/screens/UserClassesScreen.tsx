@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -11,61 +11,99 @@ import {
 } from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
-import { memberService } from "@/src/services/member.service";
+import useResponsive from "@/src/hooks/useResponsive";
+import { classService } from "@/src/services/class.service";
+import { reservationService } from "@/src/services/reservation.service";
+import { useAuthStore } from "@/src/store/auth.store";
+import { GymClass } from "@/src/types/class.types";
 
-export default function UserClassesScreen() {
-  const [classes, setClasses] = useState<any[]>([]);
+interface Props {
+  clientId?: string;
+}
+
+export default function UserClassesScreen({ clientId }: Props) {
+  const { isMobile, layout } = useResponsive();
+  const authenticatedClientId = useAuthStore((state) => state.user?.client?.id);
+  const reservationClientId = clientId ?? authenticatedClientId;
+  const [classes, setClasses] = useState<GymClass[]>([]);
+  const [reservedClassIds, setReservedClassIds] = useState<Set<string>>(new Set());
+  const [reservationIdsByClass, setReservationIdsByClass] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    testReservations();
-  }, []);
 
-  const testReservations = async () => {
+  const loadClasses = useCallback(async () => {
     try {
-      const data = await memberService.getMyReservations();
+      const classesResult = await classService.getSchedule();
+      setClasses(classesResult);
 
-      console.log("MIS RESERVAS");
-      console.log(data);
-    } catch (error: any) {
-      console.log("ERROR RESERVAS");
-      console.log(error?.response?.data);
-    }
-  };
-  useEffect(() => {
-    loadClasses();
-  }, []);
+      if (!reservationClientId) {
+        setReservedClassIds(new Set());
+        setReservationIdsByClass(new Map());
+        return;
+      }
 
-  const loadClasses = async () => {
-    try {
-      const data = await memberService.getSchedule();
-
-      console.log("CLASSES RESPONSE");
-      console.log(data);
-
-      setClasses(data.classes || []);
-    } catch (error) {
-      console.log(error);
-
+      const reservations = await reservationService.getClientReservations(reservationClientId);
+      setReservedClassIds(new Set(reservations.map((reservation) => reservation.classId)));
+      setReservationIdsByClass(
+        new Map(
+          reservations.map((reservation) => [reservation.classId, reservation.id]),
+        ),
+      );
+    } catch {
       Alert.alert("Error", "No fue posible cargar las clases");
     } finally {
       setLoading(false);
     }
-  };
+  }, [reservationClientId]);
 
   const reserveClass = async (classId: string) => {
+    if (reservedClassIds.has(classId)) {
+      return;
+    }
+
+    if (!reservationClientId) {
+      Alert.alert(
+        "Reserva no disponible",
+        "No se encontró el identificador de cliente requerido para reservar.",
+      );
+      return;
+    }
+
     try {
-      await memberService.reserveClass(classId);
+      await reservationService.createReservation({
+        clientId: reservationClientId,
+        classId,
+      });
 
       Alert.alert("Éxito", "Clase reservada correctamente");
 
-      loadClasses();
-    } catch (error: any) {
-      console.log(error);
-
+      await loadClasses();
+    } catch {
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "No fue posible reservar la clase",
+        "No fue posible reservar la clase",
       );
+    }
+  };
+
+  useEffect(() => {
+    loadClasses();
+  }, [loadClasses]);
+
+  const cancelReservation = async (classId: string) => {
+    const reservationId = reservationIdsByClass.get(classId);
+
+    if (!reservationId) {
+      return;
+    }
+
+    try {
+      await reservationService.deleteReservation(reservationId);
+      Alert.alert("Éxito", "Reserva cancelada correctamente");
+      await loadClasses();
+    } catch {
+      Alert.alert("Error", "No fue posible cancelar la reserva");
     }
   };
 
@@ -84,8 +122,8 @@ export default function UserClassesScreen() {
   }
 
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
+    <View style={[styles.card, isMobile && { padding: layout.cardPadding }]}>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Reservar Clases</Text>
 
@@ -98,11 +136,12 @@ export default function UserClassesScreen() {
       <View style={styles.list}>
         {classes.map((item) => {
           const isFull = item.availableSpots <= 0;
+          const isReserved = reservedClassIds.has(item.id);
 
           return (
             <View
               key={item.id}
-              style={[styles.classItem, isFull && styles.classItemFull]}
+              style={[styles.classItem, isMobile && styles.classItemMobile, isFull && styles.classItemFull]}
             >
               <View style={styles.iconBox}>
                 <Ionicons
@@ -143,8 +182,21 @@ export default function UserClassesScreen() {
                 </View>
               </View>
 
-              <View style={styles.right}>
-                {isFull ? (
+              <View style={[styles.right, isMobile && styles.rightMobile]}>
+                {isReserved ? (
+                  <>
+                    <Pressable style={styles.reservedButton} disabled>
+                      <Text style={styles.reservedText}>Reservado</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.cancelButton}
+                      onPress={() => cancelReservation(item.id)}
+                    >
+                      <Text style={styles.cancelText}>Cancelar reserva</Text>
+                    </Pressable>
+                  </>
+                ) : isFull ? (
                   <>
                     <View style={styles.fullRow}>
                       <Ionicons
@@ -194,12 +246,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 28,
   },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 34,
   },
+  headerMobile: { marginBottom: 20 },
 
   title: {
     color: COLORS.text,
@@ -227,6 +279,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 20,
   },
+  classItemMobile: { flexDirection: "column", alignItems: "stretch", padding: 18, gap: 14 },
 
   classItemFull: {
     borderColor: "#047857",
@@ -275,6 +328,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
   },
+  rightMobile: { justifyContent: "space-between", flexWrap: "wrap", gap: 10 },
 
   available: {
     color: COLORS.textSecondary,
@@ -302,6 +356,38 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#000",
     fontSize: 18,
+    fontWeight: "800",
+  },
+
+  reservedButton: {
+    backgroundColor: "#063d26",
+    height: 56,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  reservedText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  cancelButton: {
+    backgroundColor: "#3A1111",
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    height: 56,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  cancelText: {
+    color: COLORS.danger,
+    fontSize: 15,
     fontWeight: "800",
   },
 

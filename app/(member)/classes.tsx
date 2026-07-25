@@ -1,13 +1,3 @@
-import { Text, View } from "react-native";
+import UserClassesScreen from "@/src/features/user/screens/UserClassesScreen";
 
-import AppLayout from "@/src/components/layout/AppLayout";
-
-export default function ClassesScreen() {
-  return (
-    <AppLayout>
-      <View>
-        <Text>Classes Screen</Text>
-      </View>
-    </AppLayout>
-  );
-}
+export default UserClassesScreen;

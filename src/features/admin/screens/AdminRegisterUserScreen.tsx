@@ -9,16 +9,9 @@ import {
   View,
 } from "react-native";
 
-import { authService } from "@/src/services/auth.service";
-
-type MembershipPlan = {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  duration: number;
-  isActive?: boolean;
-};
+import { clientService } from "@/src/services/client.service";
+import { membershipService } from "@/src/services/membership.service";
+import { MembershipPlan } from "@/src/types/membership.types";
 
 export default function AdminRegisterUserScreen() {
   const [name, setName] = useState("");
@@ -39,9 +32,9 @@ export default function AdminRegisterUserScreen() {
       try {
         setLoadingPlans(true);
 
-        const plans = await authService.getMembershipPlans();
+        const plans = await membershipService.getPlans({ active: true });
 
-        setMemberships(plans || []);
+        setMemberships(plans);
       } catch (error: any) {
         setErrorMessage(
           error.response?.data?.message ||
@@ -93,7 +86,7 @@ export default function AdminRegisterUserScreen() {
     try {
       setLoading(true);
 
-      const response = await authService.registerClient({
+      const response = await clientService.registerClient({
         firstName,
         lastName,
         email: email.trim().toLowerCase(),
@@ -101,7 +94,6 @@ export default function AdminRegisterUserScreen() {
         planId: membership.id,
         startDate: new Date().toISOString().split("T")[0],
         activityId: null,
-        amount: Number(membership.price),
         paymentMethod: "CASH",
         transactionId: null,
         notes: "Cliente registrado desde panel admin",

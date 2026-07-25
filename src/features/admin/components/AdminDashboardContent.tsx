@@ -1,17 +1,22 @@
 import React, { useState } from "react";
 
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 
 import useResponsive from "@/src/hooks/useResponsive";
+import DashboardShell from "@/src/components/layout/DashboardShell";
 import AdminBottomNav from "./AdminBottomNav";
 
 import { router } from "expo-router";
 
+import { authService } from "@/src/services/auth.service";
+import { useAuthStore } from "@/src/store/auth.store";
+
 import AdminInventoryScreen from "../screens/AdminInventoryScreen";
 import AdminMembershipsScreen from "../screens/AdminMembershipsScreen";
 import AdminOverviewScreen from "../screens/AdminOverviewScreen";
+import AdminPaymentsScreen from "../screens/AdminPaymentsScreen";
 import AdminScheduleScreen from "../screens/AdminScheduleScreen";
 import AdminSettingsScreen from "../screens/AdminSettingsScreen";
 import AdminUsersScreen from "../screens/AdminUsersScreen";
@@ -22,14 +27,13 @@ type Tab =
   | "Membresías"
   | "Horarios"
   | "Inventario"
+  | "Pagos"
   | "Configuración";
 
 export default function AdminDashboardContent() {
   const [selected, setSelected] = useState<Tab>("Dashboard");
   const { isMobile } = useResponsive();
-  console.log("WIDTH:", {
-    isMobile,
-  });
+  const logout = useAuthStore((state) => state.logout);
   const renderScreen = () => {
     switch (selected) {
       case "Dashboard":
@@ -47,6 +51,9 @@ export default function AdminDashboardContent() {
       case "Inventario":
         return <AdminInventoryScreen />;
 
+      case "Pagos":
+        return <AdminPaymentsScreen />;
+
       case "Configuración":
         return <AdminSettingsScreen />;
 
@@ -55,17 +62,18 @@ export default function AdminDashboardContent() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } finally {
+      logout();
+      router.replace("/login");
+    }
+  };
+
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        isMobile && {
-          flexDirection: "column",
-        },
-      ]}
-    >
-      {/* SIDEBAR */}
-      {!isMobile && (
+    <DashboardShell
+      desktopNavigation={!isMobile && (
         <View style={styles.sidebar}>
           <View>
             {/* LOGO */}
@@ -132,6 +140,13 @@ export default function AdminDashboardContent() {
               />
 
               <MenuItem
+                label="Pagos"
+                icon="cash-outline"
+                active={selected === "Pagos"}
+                onPress={() => setSelected("Pagos")}
+              />
+
+              <MenuItem
                 label="Configuración"
                 icon="settings-outline"
                 active={selected === "Configuración"}
@@ -143,7 +158,7 @@ export default function AdminDashboardContent() {
           {/* LOGOUT */}
           <Pressable
             style={styles.logout}
-            onPress={() => router.replace("/login")}
+            onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={22} color="#9ca3af" />
 
@@ -151,12 +166,11 @@ export default function AdminDashboardContent() {
           </Pressable>
         </View>
       )}
-      {/* CONTENT */}
-      <View style={styles.content}>{renderScreen()}</View>
-      {isMobile && (
-        <AdminBottomNav selected={selected} onSelect={setSelected} />
-      )}
-    </SafeAreaView>
+      mobileNavigation={isMobile ? <AdminBottomNav selected={selected} onSelect={setSelected} onLogout={handleLogout} /> : null}
+      mobileNavigationPosition="footer"
+    >
+      {renderScreen()}
+    </DashboardShell>
   );
 }
 
@@ -176,12 +190,6 @@ function MenuItem({ label, icon, active, onPress }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#0b0b0b",
-  },
-
   sidebar: {
     width: 290,
     backgroundColor: "#050505",
@@ -296,8 +304,4 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  content: {
-    flex: 1,
-    width: "100%",
-  },
 });

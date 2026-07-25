@@ -6,30 +6,21 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
 
-import { authService } from "@/src/services/auth.service";
-
-type Plan = {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  duration: number;
-  isActive?: boolean;
-};
+import { membershipService } from "@/src/services/membership.service";
+import useResponsive from "@/src/hooks/useResponsive";
+import { MembershipPlan } from "@/src/types/membership.types";
 
 export default function AdminMembershipsScreen() {
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const { isMobile, layout } = useResponsive();
 
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showForm, setShowForm] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -44,11 +35,12 @@ export default function AdminMembershipsScreen() {
       setLoading(true);
       setErrorMessage("");
 
-      const data = await authService.getMembershipPlans();
-      setPlans(data || []);
-    } catch (error: any) {
+      const data = await membershipService.getPlans();
+      setPlans(data);
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
       setErrorMessage(
-        error.response?.data?.message ||
+        apiError.response?.data?.message ||
           "No se pudieron cargar las membresías.",
       );
     } finally {
@@ -74,13 +66,13 @@ export default function AdminMembershipsScreen() {
     setShowForm(true);
   };
 
-  const openEdit = (plan: Plan) => {
+  const openEdit = (plan: MembershipPlan) => {
     setEditingPlan(plan);
     setShowForm(true);
     setName(plan.name);
     setDescription(plan.description || "");
     setPrice(String(plan.price));
-    setDuration(String(plan.duration));
+    setDuration("");
     setErrorMessage("");
     setSuccessMessage("");
   };
@@ -99,31 +91,30 @@ export default function AdminMembershipsScreen() {
       return;
     }
 
-    if (!price || Number(price) <= 0) {
+    if (!/^[1-9]\d*$/.test(price)) {
       setErrorMessage("El precio debe ser mayor a 0.");
       return;
     }
 
-    if (!duration || Number(duration) <= 0) {
+    if (!editingPlan && (!duration || Number(duration) <= 0)) {
       setErrorMessage("La duración debe ser mayor a 0 días.");
       return;
     }
 
     try {
       if (editingPlan) {
-        await authService.updateMembershipPlan(editingPlan.id, {
+        await membershipService.updatePlan(editingPlan.id, {
           name: name.trim(),
           description: description.trim(),
-          price: Number(price),
-          duration: Number(duration),
+          price,
         });
 
         setSuccessMessage("Membresía actualizada correctamente.");
       } else {
-        await authService.createMembershipPlan({
+        await membershipService.createPlan({
           name: name.trim(),
           description: description.trim(),
-          price: Number(price),
+          price,
           duration: Number(duration),
         });
 
@@ -132,14 +123,15 @@ export default function AdminMembershipsScreen() {
 
       resetForm();
       await loadPlans();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
       setErrorMessage(
-        error.response?.data?.message || "No se pudo guardar la membresía.",
+        apiError.response?.data?.message || "No se pudo guardar la membresía.",
       );
     }
   };
 
-  const deletePlan = async (plan: Plan) => {
+  const deletePlan = async (plan: MembershipPlan) => {
     const confirmed = window.confirm(
       `¿Seguro que deseas eliminar la membresía ${plan.name}?`,
     );
@@ -147,19 +139,20 @@ export default function AdminMembershipsScreen() {
     if (!confirmed) return;
 
     try {
-      await authService.deleteMembershipPlan(plan.id);
+      await membershipService.deletePlan(plan.id);
       setSuccessMessage("Membresía eliminada correctamente.");
       await loadPlans();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
       setErrorMessage(
-        error.response?.data?.message ||
+        apiError.response?.data?.message ||
           "No se pudo eliminar. Puede tener membresías activas asociadas.",
       );
     }
   };
 
   return (
-    <ScrollView style={[styles.container, isMobile && styles.containerMobile]}>
+    <ScrollView style={[styles.container, isMobile && { padding: layout.pagePadding }]}>
       <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View>
           <Text style={[styles.title, isMobile && styles.titleMobile]}>
@@ -190,7 +183,7 @@ export default function AdminMembershipsScreen() {
       ) : null}
 
       {showForm ? (
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, isMobile && { padding: layout.cardPadding }]}>
           <Text style={styles.formTitle}>
             {editingPlan ? "Editar Membresía" : "Nueva Membresía"}
           </Text>
@@ -223,17 +216,21 @@ export default function AdminMembershipsScreen() {
             keyboardType="numeric"
           />
 
-          <Text style={styles.formLabel}>Duración en días</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="30"
-            placeholderTextColor="#777"
-            value={duration}
-            onChangeText={(value) => setDuration(value.replace(/[^0-9]/g, ""))}
-            keyboardType="numeric"
-          />
+          {!editingPlan ? (
+            <>
+              <Text style={styles.formLabel}>Duración en días</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="30"
+                placeholderTextColor="#777"
+                value={duration}
+                onChangeText={(value) => setDuration(value.replace(/[^0-9]/g, ""))}
+                keyboardType="numeric"
+              />
+            </>
+          ) : null}
 
-          <View style={styles.formActions}>
+          <View style={[styles.formActions, isMobile && styles.formActionsMobile]}>
             <Pressable style={styles.cancelButton} onPress={resetForm}>
               <Text style={styles.cancelText}>Cancelar</Text>
             </Pressable>
@@ -256,7 +253,7 @@ export default function AdminMembershipsScreen() {
       ) : (
         <View style={styles.grid}>
           {plans.map((item) => (
-            <View key={item.id} style={styles.card}>
+            <View key={item.id} style={[styles.card, isMobile && [styles.cardMobile, { padding: layout.cardPadding }]]}>
               <View style={styles.cardTop}>
                 <View style={styles.iconBox}>
                   <Ionicons name="card-outline" size={30} color="#00ff88" />
@@ -296,7 +293,12 @@ export default function AdminMembershipsScreen() {
   );
 }
 
-function Info({ label, value }: any) {
+interface InfoProps {
+  label: string;
+  value: string;
+}
+
+function Info({ label, value }: InfoProps) {
   return (
     <View style={styles.info}>
       <Text style={styles.label}>{label}</Text>
@@ -307,8 +309,6 @@ function Info({ label, value }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0b0b0b", padding: 24 },
-
-  containerMobile: { padding: 16 },
 
   header: {
     flexDirection: "row",
@@ -407,6 +407,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 22,
   },
+  formActionsMobile: { flexDirection: "column-reverse", alignItems: "stretch" },
 
   cancelButton: {
     backgroundColor: "#2a2a2a",
@@ -450,10 +451,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
-  cardMobile: {
-    width: "100%",
-    padding: 18,
-  },
+  cardMobile: { width: "100%" },
 
   cardTop: {
     flexDirection: "row",

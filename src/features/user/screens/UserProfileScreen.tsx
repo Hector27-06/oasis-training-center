@@ -10,38 +10,19 @@ import {
 } from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
-import { authService } from "@/src/services/auth.service";
-
-type ProfileData = {
-  email?: string;
-
-  user?: {
-    email?: string;
-    role?: string;
-  };
-
-  client?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    address?: string;
-    birthDate?: string;
-  };
-
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  address?: string;
-  birthDate?: string;
-};
+import useResponsive from "@/src/hooks/useResponsive";
+import { userService } from "@/src/services/user.service";
+import { UserProfile, UserProfileData } from "@/src/types/user.types";
 
 interface Props {
   userName?: string;
 }
 
 export default function UserProfileScreen({ userName }: Props) {
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const { isMobile, layout } = useResponsive();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -50,17 +31,13 @@ export default function UserProfileScreen({ userName }: Props) {
   const loadProfile = async () => {
     try {
       setLoading(true);
+      setErrorMessage("");
 
-      const response = await authService.getProfile();
-
-      console.log("PROFILE RESPONSE");
-      console.log(response);
+      const response = await userService.getProfile();
 
       setProfile(response);
-    } catch (error: any) {
-      console.log(error);
-
-      Alert.alert("Error", "No se pudo cargar la información del perfil");
+    } catch {
+      setErrorMessage("No se pudo cargar la información del perfil.");
     } finally {
       setLoading(false);
     }
@@ -76,33 +53,42 @@ export default function UserProfileScreen({ userName }: Props) {
     );
   }
 
-  const client = profile?.client ?? profile;
+  if (!profile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      </View>
+    );
+  }
+
+  const profileData = getProfileData(profile);
+  const client = profileData.client;
 
   const fullName =
-    client?.firstName && client?.lastName
+    client && client.firstName && client.lastName
       ? `${client.firstName} ${client.lastName}`
       : userName || "Usuario";
 
-  const email = profile?.user?.email || profile?.email || "Sin correo";
+  const email = profileData.email;
 
-  const phone = client?.phone || "No registrado";
+  const phone = (client && client.phone) || "No registrado";
 
-  const address = client?.address || "No registrada";
+  const address = (client && client.address) || "No registrada";
 
-  const birthDate = client?.birthDate || "No registrada";
+  const birthDate = (client && client.birthDate) || "No registrada";
 
-  const role = profile?.user?.role || "CLIENT";
+  const role = profileData.role;
 
   return (
     <>
-      <View style={styles.header}>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
         <Text style={styles.title}>Mi Perfil</Text>
 
         <Text style={styles.subtitle}>Gestiona tu información personal</Text>
       </View>
 
-      <View style={styles.profileCard}>
-        <View style={styles.cardHeader}>
+      <View style={[styles.profileCard, isMobile && { padding: layout.cardPadding }]}>
+        <View style={[styles.cardHeader, isMobile && styles.cardHeaderMobile]}>
           <Text style={styles.sectionTitle}>Información Personal</Text>
 
           <Pressable
@@ -120,7 +106,7 @@ export default function UserProfileScreen({ userName }: Props) {
           </Pressable>
         </View>
 
-        <View style={styles.formGrid}>
+        <View style={[styles.formGrid, isMobile && styles.formGridMobile]}>
           <Field
             label="Nombre completo"
             value={fullName}
@@ -144,10 +130,10 @@ export default function UserProfileScreen({ userName }: Props) {
         <Field full label="Dirección" value={address} icon="location-outline" />
       </View>
 
-      <View style={styles.membershipCard}>
+      <View style={[styles.membershipCard, isMobile && { padding: layout.cardPadding }]}>
         <Text style={styles.sectionTitle}>Estado de la Cuenta</Text>
 
-        <View style={styles.membershipGrid}>
+        <View style={[styles.membershipGrid, isMobile && styles.membershipGridMobile]}>
           <Info label="Estado" value="Activa" green />
 
           <Info label="Rol" value={role} />
@@ -157,6 +143,10 @@ export default function UserProfileScreen({ userName }: Props) {
       </View>
     </>
   );
+}
+
+function getProfileData(profile: UserProfile): UserProfileData {
+  return "user" in profile ? profile.user : profile;
 }
 
 function Field({
@@ -170,8 +160,9 @@ function Field({
   icon: keyof typeof Ionicons.glyphMap;
   full?: boolean;
 }) {
+  const { isMobile } = useResponsive();
   return (
-    <View style={[styles.field, full && styles.fullField]}>
+    <View style={[styles.field, isMobile && styles.fieldMobile, full && styles.fullField]}>
       <View style={styles.labelRow}>
         <Ionicons name={icon} size={16} color={COLORS.textSecondary} />
 
@@ -216,12 +207,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 16,
+    textAlign: "center",
+  },
+
   header: {
     paddingBottom: 26,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     marginBottom: 26,
   },
+  headerMobile: { paddingBottom: 16, marginBottom: 16 },
 
   title: {
     color: COLORS.text,
@@ -246,12 +244,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "100%",
   },
-
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 24,
   },
+  cardHeaderMobile: { flexDirection: "column", alignItems: "flex-start", gap: 14 },
 
   sectionTitle: {
     color: COLORS.text,
@@ -280,11 +278,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 22,
   },
+  formGridMobile: { gap: 0 },
 
   field: {
     flexBasis: "48%",
     marginBottom: 22,
   },
+  fieldMobile: { flexBasis: "100%" },
 
   fullField: {
     flexBasis: "100%",
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
 
   inputLike: {
-    height: 50,
+    minHeight: 50,
     backgroundColor: "#151515",
     borderWidth: 1,
     borderColor: "#222222",
@@ -318,6 +318,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 16,
     fontWeight: "700",
+    flexShrink: 1,
   },
 
   membershipCard: {
@@ -336,6 +337,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 20,
   },
+  membershipGridMobile: { flexDirection: "column", gap: 16, marginTop: 16 },
 
   infoLabel: {
     color: COLORS.textSecondary,

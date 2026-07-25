@@ -1,9 +1,5 @@
-import { Text, View } from "react-native";
+import { Redirect } from "expo-router";
 
 export default function ReportsScreen() {
-  return (
-    <View>
-      <Text>Reports</Text>
-    </View>
-  );
+  return <Redirect href="/(admin)/admin-dashboard" />;
 }

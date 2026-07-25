@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AxiosError } from "axios";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -17,7 +18,7 @@ type LoginFormData = {
 };
 
 export default function LoginForm() {
-  const { setUser } = useAuthStore();
+  const { setMustChangePassword, setUser } = useAuthStore();
 
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,8 +46,6 @@ export default function LoginForm() {
         password: data.password,
       });
 
-      console.log("LOGIN RESPONSE:", response);
-
       const apiUser = response.user;
 
       setUser({
@@ -57,13 +56,13 @@ export default function LoginForm() {
             : "Admin",
         email: apiUser.email,
         role: apiUser.role === "ADMIN" ? "admin" : "member",
+        client: apiUser.client,
       });
 
-      // Si viene contraseña temporal simplemente dejamos entrar
       if (response.mustChangePassword) {
-        console.log(
-          "Usuario con contraseña temporal. Puede cambiarla después desde Perfil.",
-        );
+        setMustChangePassword(true);
+        router.replace("/(auth)/change-password");
+        return;
       }
 
       if (apiUser.role === "ADMIN") {
@@ -71,11 +70,12 @@ export default function LoginForm() {
       } else {
         router.replace("/member-dashboard");
       }
-    } catch (error: any) {
-      console.log("LOGIN ERROR:", error?.response?.data);
-
+    } catch (error) {
+      const response = (error as AxiosError<{ message?: string | string[] }>).response;
+      const apiMessage = response?.data?.message;
       const message =
-        error?.response?.data?.message || "Correo o contraseña incorrectos";
+        (Array.isArray(apiMessage) ? apiMessage[0] : apiMessage) ||
+        "Correo o contraseña incorrectos";
 
       setLoginError(message);
     } finally {

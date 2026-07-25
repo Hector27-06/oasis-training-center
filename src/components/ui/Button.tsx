@@ -21,11 +21,7 @@ export default function Button({
 
   return (
     <Pressable
-      onPress={() => {
-        console.log("BOTÓN PRESIONADO:", title);
-
-        onPress();
-      }}
+      onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
@@ -57,8 +53,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     marginTop: 10,
-
-    //cursor: "pointer" as any,
   },
 
   pressed: {

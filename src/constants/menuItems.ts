@@ -28,6 +28,12 @@ export const memberMenu = [
     route: "/profile",
     icon: "person-outline",
   },
+
+  {
+    label: "Notificaciones",
+    route: "/notifications",
+    icon: "notifications-outline",
+  },
 ] as const;
 
 export type UserMenuItem = (typeof memberMenu)[number]["label"];

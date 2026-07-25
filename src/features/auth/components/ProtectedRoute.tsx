@@ -10,9 +10,19 @@ interface Props {
 
 export default function ProtectedRoute({ children, allowedRole }: Props) {
   const user = useAuthStore((state) => state.user);
+  const isInitializing = useAuthStore((state) => state.isInitializing);
+  const mustChangePassword = useAuthStore((state) => state.mustChangePassword);
+
+  if (isInitializing) {
+    return null;
+  }
 
   if (!user) {
     return <Redirect href={"/(auth)/login" as any} />;
+  }
+
+  if (mustChangePassword) {
+    return <Redirect href="/(auth)/change-password" />;
   }
 
   if (allowedRole && user.role !== allowedRole) {

@@ -1,21 +1,50 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { COLORS } from "@/src/constants/colors";
+import useResponsive from "@/src/hooks/useResponsive";
+import { membershipService } from "@/src/services/membership.service";
+import { Membership } from "@/src/types/membership.types";
 
 export default function UserMembershipScreen() {
+  const { isMobile, layout } = useResponsive();
+  const [membership, setMembership] = useState<Membership | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const loadMembership = async () => {
+      try {
+        setErrorMessage("");
+        setMembership(await membershipService.getMyMembership());
+      } catch {
+        setErrorMessage("No fue posible cargar tu membresía.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMembership();
+  }, []);
+
   return (
     <>
-      <View style={styles.header}>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
         <Text style={styles.title}>Mi Membresía</Text>
         <Text style={styles.subtitle}>Información de tu membresía actual</Text>
       </View>
 
-      <View style={styles.membershipCard}>
+      {loading ? <Text style={styles.message}>Cargando membresía...</Text> : null}
+      {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
+      {!loading && !errorMessage && !membership ? (
+        <Text style={styles.message}>No tienes una membresía vigente.</Text>
+      ) : null}
+
+      {membership ? <View style={[styles.membershipCard, isMobile && { padding: layout.cardPadding }]}>
         <View style={styles.membershipTop}>
           <View>
-            <Text style={styles.planTitle}>Membresía Actual</Text>
+            <Text style={styles.planTitle}>{membership.plan.name}</Text>
 
             <View style={styles.activeRow}>
               <Ionicons
@@ -24,20 +53,26 @@ export default function UserMembershipScreen() {
                 color={COLORS.primary}
               />
 
-              <Text style={styles.activeText}>Activa</Text>
+              <Text style={styles.activeText}>{membership.status}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.infoGrid}>
-          <InfoBox title="Plan" value="-" icon="card-outline" />
+        <View style={[styles.infoGrid, isMobile && styles.infoGridMobile]}>
+          <InfoBox title="Plan" value={membership.plan.name} icon="card-outline" />
 
-          <InfoBox title="Fecha inicio" value="-" icon="calendar-outline" />
+          <InfoBox title="Fecha inicio" value={formatDate(membership.startDate)} icon="calendar-outline" />
 
-          <InfoBox title="Fecha vencimiento" value="-" icon="time-outline" />
+          <InfoBox title="Fecha vencimiento" value={formatDate(membership.endDate)} icon="time-outline" />
         </View>
-      </View>
+      </View> : null}
     </>
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
+    new Date(value),
   );
 }
 
@@ -82,6 +117,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 8,
   },
+  headerMobile: { paddingBottom: 16, marginBottom: 16 },
+
+  message: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
+  },
+
+  errorMessage: {
+    color: "#ff6666",
+    fontSize: 16,
+  },
 
   membershipCard: {
     backgroundColor: "#042F1E",
@@ -90,7 +136,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 28,
   },
-
   membershipTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -120,6 +165,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 18,
   },
+  infoGridMobile: { flexDirection: "column", gap: 12 },
 
   infoBox: {
     flex: 1,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,23 +13,25 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 
-import { authService } from "@/src/services/auth.service";
+import { Client, clientService } from "@/src/services/client.service";
+import { userService } from "@/src/services/user.service";
+import { UserAccount } from "@/src/types/user.types";
+import AdminMobileDataCard from "@/src/features/admin/components/AdminMobileDataCard";
+import useResponsive from "@/src/hooks/useResponsive";
 
 import AdminRegisterUserScreen from "./AdminRegisterUserScreen";
 
-type Client = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  user?: {
-    email: string;
-    role: string;
-    isActive: boolean;
-  };
-};
-
 export default function AdminUsersScreen() {
+  const [section, setSection] = useState<"users" | "clients">("users");
+
+  if (section === "clients") {
+    return <AdminClientsScreen onShowUsers={() => setSection("users")} />;
+  }
+
+  return <UserAccountsScreen onShowClients={() => setSection("clients")} />;
+}
+
+function AdminClientsScreen({ onShowUsers }: { onShowUsers: () => void }) {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
@@ -51,10 +54,10 @@ export default function AdminUsersScreen() {
       setLoading(true);
       setErrorMessage("");
 
-      const data = await authService.getClients();
+      const response = await clientService.getClients({ limit: 50 });
 
-      setClients(data || []);
-      setFilteredClients(data || []);
+      setClients(response.data);
+      setFilteredClients(response.data);
     } catch (error: any) {
       setErrorMessage(
         error.response?.data?.message || "No se pudieron cargar los usuarios.",
@@ -121,7 +124,7 @@ export default function AdminUsersScreen() {
     }
 
     try {
-      await authService.updateClient(editingClient.id, {
+      await clientService.updateClient(editingClient.id, {
         firstName,
         lastName,
         phone: editPhone.trim(),
@@ -138,14 +141,8 @@ export default function AdminUsersScreen() {
   };
 
   const deleteClient = async (client: Client) => {
-    const confirmDelete = window.confirm(
-      `¿Seguro que deseas eliminar a ${client.firstName} ${client.lastName}?`,
-    );
-
-    if (!confirmDelete) return;
-
     try {
-      await authService.deleteClient(client.id);
+      await clientService.deleteClient(client.id);
 
       setSuccessMessage("Usuario eliminado correctamente.");
       await loadClients();
@@ -154,6 +151,17 @@ export default function AdminUsersScreen() {
         error.response?.data?.message || "No se pudo eliminar el usuario.",
       );
     }
+  };
+
+  const confirmDelete = (client: Client) => {
+    Alert.alert(
+      "Eliminar cliente",
+      `¿Seguro que deseas eliminar a ${client.firstName} ${client.lastName}?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => void deleteClient(client) },
+      ],
+    );
   };
 
   if (showRegister) {
@@ -165,23 +173,28 @@ export default function AdminUsersScreen() {
       <View style={[styles.topBar, isMobile && styles.topBarMobile]}>
         <View>
           <Text style={[styles.title, isMobile && styles.titleMobile]}>
-            Gestión de Usuarios
+            Gestión de Clientes
           </Text>
           <Text style={styles.subtitle}>
-            Clientes registrados desde el panel administrativo
+            Información, edición y baja de clientes
           </Text>
         </View>
 
-        <Pressable
-          style={[
-            styles.registerButton,
-            isMobile && styles.registerButtonMobile,
-          ]}
-          onPress={() => setShowRegister(true)}
-        >
-          <Ionicons name="person-add-outline" size={20} color="#000" />
-          <Text style={styles.registerText}>Registrar Cliente</Text>
-        </Pressable>
+        <View style={[styles.headerActions, isMobile && styles.headerActionsMobile]}>
+          <Pressable style={styles.secondaryButton} onPress={onShowUsers}>
+            <Text style={styles.secondaryButtonText}>Cuentas</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.registerButton,
+              isMobile && styles.registerButtonMobile,
+            ]}
+            onPress={() => setShowRegister(true)}
+          >
+            <Ionicons name="person-add-outline" size={20} color="#000" />
+            <Text style={styles.registerText}>Registrar Cliente</Text>
+          </Pressable>
+        </View>
       </View>
 
       {errorMessage ? (
@@ -218,7 +231,7 @@ export default function AdminUsersScreen() {
             placeholderTextColor="#777"
           />
 
-          <View style={styles.editActions}>
+          <View style={[styles.editActions, isMobile && styles.editActionsMobile]}>
             <Pressable style={styles.cancelButton} onPress={cancelEdit}>
               <Text style={styles.cancelText}>Cancelar</Text>
             </Pressable>
@@ -253,25 +266,22 @@ export default function AdminUsersScreen() {
       ) : isMobile ? (
         <View style={styles.mobileList}>
           {filteredClients.map((client) => (
-            <View key={client.id} style={styles.mobileCard}>
-              <View style={styles.mobileCardTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>
-                    {client.firstName} {client.lastName}
-                  </Text>
-                  <Text style={styles.email}>ID: {client.id.slice(0, 8)}</Text>
-                </View>
-
-                <Text
-                  style={[
-                    styles.badge,
-                    client.user?.isActive ? styles.active : styles.expired,
-                  ]}
-                >
-                  {client.user?.isActive ? "Activo" : "Inactivo"}
-                </Text>
-              </View>
-
+            <AdminMobileDataCard
+              key={client.id}
+              title={`${client.firstName} ${client.lastName}`}
+              subtitle={`ID: ${client.id.slice(0, 8)}`}
+              badge={<Text style={[styles.badge, client.user?.isActive ? styles.active : styles.expired]}>{client.user?.isActive ? "Activo" : "Inactivo"}</Text>}
+              actions={<>
+                <Pressable style={styles.mobileActionBtn} onPress={() => openEdit(client)}>
+                  <Ionicons name="create-outline" size={18} color="#9ca3af" />
+                  <Text style={styles.mobileActionText}>Editar</Text>
+                </Pressable>
+                <Pressable style={styles.mobileActionBtn} onPress={() => confirmDelete(client)}>
+                  <Ionicons name="trash-outline" size={18} color="#ff6666" />
+                  <Text style={[styles.mobileActionText, styles.dangerText]}>Eliminar</Text>
+                </Pressable>
+              </>}
+            >
               <View style={styles.mobileRow}>
                 <Ionicons name="mail-outline" size={16} color="#8b8b8b" />
                 <Text style={styles.mobileText} numberOfLines={1}>
@@ -286,26 +296,7 @@ export default function AdminUsersScreen() {
                 </Text>
               </View>
 
-              <View style={styles.mobileActions}>
-                <Pressable
-                  style={styles.mobileActionBtn}
-                  onPress={() => openEdit(client)}
-                >
-                  <Ionicons name="create-outline" size={18} color="#9ca3af" />
-                  <Text style={styles.mobileActionText}>Editar</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.mobileActionBtn}
-                  onPress={() => deleteClient(client)}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#ff6666" />
-                  <Text style={[styles.mobileActionText, { color: "#ff6666" }]}>
-                    Eliminar
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+            </AdminMobileDataCard>
           ))}
         </View>
       ) : (
@@ -353,7 +344,7 @@ export default function AdminUsersScreen() {
                   <Ionicons name="create-outline" size={20} color="#9ca3af" />
                 </Pressable>
 
-                <Pressable onPress={() => deleteClient(client)}>
+                <Pressable onPress={() => confirmDelete(client)}>
                   <Ionicons name="trash-outline" size={20} color="#ff6666" />
                 </Pressable>
               </View>
@@ -363,6 +354,127 @@ export default function AdminUsersScreen() {
       )}
     </ScrollView>
   );
+}
+
+function UserAccountsScreen({ onShowClients }: { onShowClients: () => void }) {
+  const { isMobile } = useResponsive();
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+      const response = await userService.getUsers({ limit: 50 });
+      setUsers(response.data);
+    } catch (error: unknown) {
+      setErrorMessage(getApiErrorMessage(error, "No se pudieron cargar las cuentas."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  const toggleUserStatus = async (user: UserAccount) => {
+    try {
+      setErrorMessage("");
+      setSuccessMessage("");
+      await userService.updateUser(user.id, { isActive: !user.isActive });
+      setSuccessMessage(`Cuenta ${user.isActive ? "desactivada" : "activada"} correctamente.`);
+      await loadUsers();
+    } catch (error: unknown) {
+      setErrorMessage(getApiErrorMessage(error, "No se pudo actualizar el estado de la cuenta."));
+    }
+  };
+
+  return (
+    <ScrollView style={[styles.container, isMobile && styles.containerMobile]}>
+      <View style={[styles.topBar, isMobile && styles.topBarMobile]}>
+        <View>
+          <Text style={styles.title}>Gestión de Usuarios</Text>
+          <Text style={styles.subtitle}>Cuentas, roles y estado de acceso</Text>
+        </View>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={onShowClients}>
+          <Text style={styles.secondaryButtonText}>Gestionar clientes</Text>
+        </Pressable>
+      </View>
+
+      {errorMessage ? <View style={styles.errorBox}><Text style={styles.errorText}>✕ {errorMessage}</Text></View> : null}
+      {successMessage ? <View style={styles.successBox}><Text style={styles.successText}>✓ {successMessage}</Text></View> : null}
+
+      {loading ? (
+        <View style={styles.emptyBox}><Text style={styles.emptyText}>Cargando cuentas...</Text></View>
+      ) : users.length === 0 ? (
+        <View style={styles.emptyBox}><Text style={styles.emptyText}>No hay cuentas registradas.</Text></View>
+      ) : isMobile ? (
+        <View style={styles.mobileList}>
+          {users.map((user) => (
+            <AdminMobileDataCard
+              key={user.id}
+              title={user.email}
+              subtitle="Cuenta de acceso"
+              badge={<Text style={[styles.badge, user.isActive ? styles.active : styles.expired]}>{user.isActive ? "Activo" : "Inactivo"}</Text>}
+              actions={<Pressable style={styles.mobileStatusButton} onPress={() => void toggleUserStatus(user)}><Text style={styles.statusButtonText}>{user.isActive ? "Desactivar cuenta" : "Activar cuenta"}</Text></Pressable>}
+            >
+              <View style={styles.mobileRow}>
+                <Ionicons name="mail-outline" size={16} color="#8b8b8b" />
+                <Text style={styles.mobileText} numberOfLines={1} ellipsizeMode="tail">{user.email}</Text>
+              </View>
+              <View style={styles.mobileRow}>
+                <Ionicons name="shield-outline" size={16} color="#8b8b8b" />
+                <Text style={styles.mobileText}>Rol: {user.role}</Text>
+              </View>
+            </AdminMobileDataCard>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.table}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.th, { flex: 2 }]}>Correo</Text>
+            <Text style={[styles.th, { flex: 1 }]}>Rol</Text>
+            <Text style={[styles.th, { flex: 1 }]}>Estado</Text>
+            <Text style={[styles.th, { width: 130, textAlign: "right" }]}>Acciones</Text>
+          </View>
+          {users.map((user) => (
+            <View key={user.id} style={styles.row}>
+              <Text style={[styles.membership, { flex: 2 }]}>{user.email}</Text>
+              <Text style={[styles.date, { flex: 1 }]}>{user.role}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.badge, user.isActive ? styles.active : styles.expired]}>
+                  {user.isActive ? "Activo" : "Inactivo"}
+                </Text>
+              </View>
+              <View style={{ width: 130, alignItems: "flex-end" }}>
+                <Pressable style={styles.statusButton} onPress={() => void toggleUserStatus(user)}>
+                  <Text style={styles.statusButtonText}>{user.isActive ? "Desactivar" : "Activar"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (typeof error !== "object" || error === null || !("response" in error)) return fallback;
+
+  const response = error.response;
+  if (typeof response !== "object" || response === null || !("data" in response)) return fallback;
+
+  const data = response.data;
+  if (typeof data !== "object" || data === null || !("message" in data)) return fallback;
+
+  const message = data.message;
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message.join(", ");
+  return fallback;
 }
 
 const styles = StyleSheet.create({
@@ -405,6 +517,33 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "900",
     fontSize: 15,
+  },
+
+  secondaryButton: {
+    backgroundColor: "#1f1f1f",
+    borderColor: "#3a3a3a",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+
+  secondaryButtonText: {
+    color: "#fff",
+    fontWeight: "800",
+  },
+
+  statusButton: {
+    backgroundColor: "#1f1f1f",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  statusButtonText: {
+    color: "#00ff88",
+    fontWeight: "800",
+    fontSize: 13,
   },
 
   errorBox: {
@@ -619,6 +758,18 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     gap: 16,
   },
+  editActionsMobile: { flexDirection: "column-reverse", alignItems: "stretch" },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  headerActionsMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
 
   titleMobile: {
     fontSize: 22,
@@ -679,6 +830,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: "#1c1c1c",
     borderRadius: 10,
+    justifyContent: "center",
   },
 
   mobileActionText: {
@@ -686,4 +838,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
   },
+
+  mobileStatusButton: { backgroundColor: "#075C39", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  dangerText: { color: "#ff6666" },
+  secondaryButtonMobile: { width: "100%", alignItems: "center" },
 });
